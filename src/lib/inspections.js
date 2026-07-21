@@ -19,7 +19,7 @@ export async function saveInspection({
     .single();
 
   if (locError || !location) {
-    return { error: ไม่พบจุดตรวจสอบ (location code: ${locationCode}) กรุณาตรวจสอบข้อมูลใน locations ก่อน };
+    return { error: `ไม่พบจุดตรวจสอบ (location code: ${locationCode}) กรุณาตรวจสอบข้อมูลใน locations ก่อน` };
   }
 
   const { data: inspection, error: insError } = await supabase
