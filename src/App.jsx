@@ -204,6 +204,7 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
 
 // ---------- โมดูล: บันทึกประจำวัน (ฟอร์มธรรมดา ไม่ใช้ checklist_templates) ----------
 function DailyLogModule({ vehicle, user, onBack, onSaved }) {
+  const isReadOnly = user.role === 'ADMIN';
   const [mileage, setMileage] = useState('');
   const [fuel, setFuel] = useState('F');
   const [note, setNote] = useState('');
@@ -266,6 +267,7 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
 //         photo_attach (ปุ่มแนบรูป), reminder_note (ป้ายเตือน)
 // -------------------------------------------------------------------------
 function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone }) {
+  const isReadOnly = user.role === 'ADMIN';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -348,7 +350,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     <div className="screen">
       <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={onBack} />
       <main className="form-body">
-        <div className="checklist">
+        <div className="checklist" style={isReadOnly ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
           {items.map((it) => {
             if (it.is_header) {
               return <div className="checklist-header" key={it.id}>{it.item_name}</div>;
@@ -411,10 +413,16 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                 {overallStatus === 'READY' ? 'พร้อมใช้งาน' : `ไม่พร้อมใช้งาน (${problemCount} รายการ)`}
               </span>
             </div>
-            {submitError && <div className="form-error">{submitError}</div>}
-            <button className="btn-primary" disabled={!allAnswered || submitting} onClick={handleSubmit}>
-              {submitting ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบ'}
-            </button>
+            {isReadOnly ? (
+              <div className="empty-state">👁 โหมดดูอย่างเดียว (Admin) — ไม่สามารถบันทึกหรือแก้ไขข้อมูลได้</div>
+            ) : (
+              <>
+                {submitError && <div className="form-error">{submitError}</div>}
+                <button className="btn-primary" disabled={!allAnswered || submitting} onClick={handleSubmit}>
+                  {submitting ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบ'}
+                </button>
+              </>
+            )}
           </>
         )}
       </main>
