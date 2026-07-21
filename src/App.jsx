@@ -361,11 +361,14 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                   {it.standard_qty && <div className="checklist-standard">มาตรฐาน: {it.standard_qty}</div>}
                   {it.reminder_note && <div className="reminder-banner">🔔 {it.reminder_note}</div>}
 
-                  {it.has_expiry && (
-                    <div className="med-row">
-                      <input type="date" className="text-input" value={a.expiry || ''} onChange={(e) => setAnswer(it.id, { expiry: e.target.value })} />
-                      <span className={`med-status-pill ${medStatusClass[medStatus(a.expiry)]}`}>{medStatusLabel[medStatus(a.expiry)]}</span>
-                    </div>
+                 {it.has_expiry && (
+                    <>
+                      <div className="field-label" style={{ marginBottom: 6 }}>วันหมดอายุ (Exp.)</div>
+                      <div className="med-row">
+                        <input type="date" className="text-input" value={a.expiry || ''} onChange={(e) => setAnswer(it.id, { expiry: e.target.value })} />
+                        <span className={`med-status-pill ${medStatusClass[medStatus(a.expiry)]}`}>{medStatusLabel[medStatus(a.expiry)]}</span>
+                      </div>
+                    </>
                   )}
 
                   {it.numeric_input && (
@@ -386,9 +389,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                     </div>
                   )}
 
-                  {a.status === 'NOT_OK' && !it.has_expiry && !it.numeric_input && (
-                    <input type="text" className="text-input note-input" placeholder="ระบุปัญหาที่พบ" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
-                  )}
+                  <input type="text" className="text-input note-input" placeholder="หมายเหตุ (ถ้ามี)" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
 
                   {it.photo_attach && (
                     <button type="button" className={`photo-btn ${a.photo ? 'photo-btn-active' : ''}`} onClick={() => setAnswer(it.id, { photo: !a.photo })}>
