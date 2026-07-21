@@ -1,122 +1,524 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect, useMemo } from 'react';
+import { loginWithUsername, logout } from './lib/auth';
+import { saveInspection } from './lib/inspections';
+import { getLocationsForRole, getChecklistItems } from './lib/checklist';
+import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+function formatThaiDateTime(date) {
+  return date.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const diff = (new Date(dateStr) - new Date(todayISO())) / (1000 * 60 * 60 * 24);
+  return Math.round(diff);
+}
+function medStatus(dateStr) {
+  const d = daysUntil(dateStr);
+  if (d === null) return 'UNSET';
+  if (d < 0) return 'EXPIRED';
+  if (d <= 90) return 'NEAR';
+  return 'OK';
+}
+const medStatusLabel = { OK: 'ปกติ', NEAR: 'ใกล้หมด', EXPIRED: 'หมดอายุ', UNSET: 'ยังไม่ระบุ' };
+const medStatusClass = { OK: 'med-status-ok', NEAR: 'med-status-near', EXPIRED: 'med-status-expired', UNSET: 'med-status-unset' };
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="topbar-time">{now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>;
 }
 
-export default App
+function TopBar({ title, sub, onBack, backLabel }) {
+  return (
+    <header className="topbar">
+      <div>
+        <div className="topbar-title">{title}</div>
+        {sub && <div className="topbar-sub">{sub}</div>}
+      </div>
+      <div className="topbar-right">
+        <LiveClock />
+        {onBack && <button className="btn-ghost" onClick={onBack}>{backLabel || '‹ กลับ'}</button>}
+      </div>
+    </header>
+  );
+}
+
+// -------------------------------------------------------------------------
+// หน้าจอ Login จริง — ผ่าน Supabase Auth (username/password)
+// -------------------------------------------------------------------------
+function LoginScreen({ onLoggedIn }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!username.trim() || !password) { setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน'); return; }
+    setError('');
+    setLoading(true);
+    const result = await loginWithUsername(username, password);
+    setLoading(false);
+    if (result.error) { setError(result.error); return; }
+    onLoggedIn(result.user);
+  };
+
+  return (
+    <div className="screen center">
+      <div className="auth-card">
+        <div className="auth-badge">AOT MEDICAL CLINIC</div>
+        <h1 className="auth-title">ตรวจสอบความพร้อมใช้งาน</h1>
+        <p className="auth-subtitle">รถพยาบาล · อุปกรณ์ · เวชภัณฑ์ · ยา</p>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label className="field-label" htmlFor="username">ชื่อผู้ใช้ (Username)</label>
+          <input id="username" type="text" className="text-input" placeholder="เช่น nurse1" value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" />
+          <label className="field-label" style={{ marginTop: 16 }} htmlFor="password">รหัสผ่าน</label>
+          <input id="password" type="password" className="text-input" placeholder="รหัสผ่าน" value={password} onChange={(e) => setPassword(e.target.value)} />
+          {error && <div className="form-error">{error}</div>}
+          <button type="submit" className="btn-primary" style={{ marginTop: 24 }} disabled={loading}>
+            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบตรวจสอบ'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
+// -------------------------------------------------------------------------
+function MainMenu({ user, onSelectCategory, onLogout }) {
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const res = await getLocationsForRole(user.role);
+      if (res.error) setLoadError(res.error);
+      else setLocations(res.data || []);
+      setLoading(false);
+    })();
+  }, [user.role]);
+
+  const categories = useMemo(() => {
+    const byCategory = {};
+    locations.forEach((loc) => {
+      if (!byCategory[loc.category]) byCategory[loc.category] = [];
+      byCategory[loc.category].push(loc);
+    });
+    return Object.keys(byCategory)
+      .map((cat) => ({ id: cat, meta: CATEGORY_META[cat] || { label: cat, subtitle: '', order: 99 }, locations: byCategory[cat] }))
+      .sort((a, b) => a.meta.order - b.meta.order);
+  }, [locations]);
+
+  return (
+    <div className="screen">
+      <TopBar title="AOT MEDICAL CLINIC" sub={`${user.name} · ${ROLES[user.role]?.label || user.role}`} onBack={onLogout} backLabel="ออกจากระบบ" />
+      <main className="menu-grid">
+        {loading && <div className="empty-state">กำลังโหลดรายการ...</div>}
+        {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
+        {!loading && !loadError && categories.map((cat) => (
+          <button key={cat.id} className="menu-card" onClick={() => onSelectCategory(cat)}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-num">รายการที่ {cat.meta.num}</div>
+            <div className="menu-card-label">{cat.meta.label}</div>
+            <div className="menu-card-subtitle">{cat.meta.subtitle}</div>
+          </button>
+        ))}
+        {!loading && !loadError && categories.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบ</div>}
+      </main>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// เลือกสถานที่ย่อยภายในหมวด (ใช้เมื่อ category มีมากกว่า 1 location เช่น รถพยาบาล, Station)
+// -------------------------------------------------------------------------
+function LocationPicker({ categoryMeta, locations, onSelectLocation, onBack }) {
+  return (
+    <div className="screen">
+      <TopBar title={categoryMeta.label} sub="เลือกจุดที่ต้องการตรวจสอบ" onBack={onBack} />
+      <main className="menu-grid">
+        {locations.map((loc, idx) => (
+          <button key={loc.id} className="menu-card" onClick={() => onSelectLocation(loc)}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-num">จุดที่ {idx + 1}</div>
+            <div className="menu-card-label">{loc.label}</div>
+          </button>
+        ))}
+      </main>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// เลือกกลุ่ม module_key ย่อยภายใน location หนึ่งๆ
+// -------------------------------------------------------------------------
+function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
+  const groups = (LOCATION_MODULE_GROUPS[location.code] || []).filter(
+    (g) => !g.allowedRoles || g.allowedRoles.includes(user.role)
+  );
+  return (
+    <div className="screen">
+      <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
+      <main className="menu-grid">
+        {groups.map((g) => (
+          <button key={g.moduleKey} className="menu-card" onClick={() => onSelectModule(g)}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-label">{g.label}</div>
+          </button>
+        ))}
+        {groups.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบในจุดนี้</div>}
+      </main>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// รถพยาบาล: เลือกคันรถ > เมนูย่อย 4 โมดูล
+// -------------------------------------------------------------------------
+function ModuleMenu({ vehicle, onSelectModule, onBack }) {
+  return (
+    <div className="screen">
+      <TopBar title={`${vehicle.label} — ALS`} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
+      <main className="menu-grid">
+        {AMBULANCE_MODULES.map((m) => (
+          <button key={m.id} className="menu-card" onClick={() => onSelectModule(m)}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-label">{m.label}</div>
+            <div className="menu-card-subtitle">{m.subtitle}</div>
+          </button>
+        ))}
+      </main>
+    </div>
+  );
+}
+
+// ---------- โมดูล: บันทึกประจำวัน (ฟอร์มธรรมดา ไม่ใช้ checklist_templates) ----------
+function DailyLogModule({ vehicle, user, onBack, onSaved }) {
+  const [mileage, setMileage] = useState('');
+  const [fuel, setFuel] = useState('F');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const fuelLevels = [
+    { key: 'F', label: 'เต็ม (F)' }, { key: '3/4', label: '3/4' }, { key: '1/2', label: '1/2' },
+    { key: '1/4', label: '1/4' }, { key: 'E', label: 'ต่ำ (E)' },
+  ];
+
+  const handleSave = async () => {
+    if (!mileage.trim()) { setError('กรุณากรอกเลขไมล์'); return; }
+    setSaving(true);
+    setError('');
+    const result = await saveInspection({
+      locationCode: vehicle.code,
+      moduleKey: 'ambulance_daily',
+      inspectorId: user.id,
+      inspectorName: user.name,
+      overallStatus: 'READY',
+      items: [],
+      mileage,
+      fuelLevel: fuel,
+      note,
+    });
+    setSaving(false);
+    if (result.error) setError(result.error); else onSaved();
+  };
+
+  return (
+    <div className="screen">
+      <TopBar title="บันทึกประจำวัน" sub={`${vehicle.label} · ${formatThaiDateTime(new Date())}`} onBack={onBack} />
+      <main className="form-body">
+        <label className="field-label">เลขไมล์ (กม.) *</label>
+        <input className="text-input" placeholder="เช่น 123456" value={mileage} onChange={(e) => setMileage(e.target.value)} />
+
+        <label className="field-label" style={{ marginTop: 16 }}>ปริมาณน้ำมัน</label>
+        <div className="fuel-buttons">
+          {fuelLevels.map((f) => (
+            <button key={f.key} type="button" className={`fuel-btn ${fuel === f.key ? 'fuel-btn-active' : ''}`} onClick={() => setFuel(f.key)}>{f.label}</button>
+          ))}
+        </div>
+
+        <label className="field-label" style={{ marginTop: 16 }}>หมายเหตุ / ปัญหาที่พบ</label>
+        <textarea className="text-input textarea" placeholder="ระบุปัญหาหรือข้อสังเกต..." value={note} onChange={(e) => setNote(e.target.value)} />
+
+        {error && <div className="form-error">{error}</div>}
+        <button className="btn-primary" style={{ marginTop: 16 }} disabled={saving} onClick={handleSave}>
+          {saving ? 'กำลังบันทึก...' : 'บันทึกการตรวจสอบวันนี้'}
+        </button>
+      </main>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// ฟอร์มตรวจสอบแบบ Dynamic — ใช้ได้กับทุก module_key ที่ดึงจาก checklist_templates
+// รองรับ: is_header (หัวข้อคั่น), has_expiry (วันหมดอายุ), numeric_input (กรอกจำนวน),
+//         photo_attach (ปุ่มแนบรูป), reminder_note (ป้ายเตือน)
+// -------------------------------------------------------------------------
+function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [answers, setAnswers] = useState({}); // id -> { status, note, expiry, amount, photo }
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const res = await getChecklistItems(moduleKey);
+      if (res.error) setLoadError(res.error);
+      else setItems(res.data || []);
+      setLoading(false);
+    })();
+  }, [moduleKey]);
+
+  const rows = items.filter((it) => !it.is_header);
+  const setAnswer = (id, patch) => setAnswers((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }));
+
+  const isAnswered = (it) => {
+    const a = answers[it.id] || {};
+    if (it.has_expiry) return !!a.expiry;
+    if (it.numeric_input) return a.amount !== undefined && a.amount !== '';
+    return a.status === 'OK' || a.status === 'NOT_OK';
+  };
+  const allAnswered = rows.every(isAnswered);
+
+  const isProblem = (it) => {
+    const a = answers[it.id] || {};
+    if (it.has_expiry) return medStatus(a.expiry) === 'EXPIRED';
+    if (it.numeric_input) return false;
+    return a.status === 'NOT_OK';
+  };
+  const problemCount = rows.filter(isProblem).length;
+  const overallStatus = problemCount === 0 ? 'READY' : 'NOT_READY';
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitError('');
+    const result = await saveInspection({
+      locationCode,
+      moduleKey,
+      inspectorId: user.id,
+      inspectorName: user.name,
+      overallStatus,
+      items: rows.map((it) => {
+        const a = answers[it.id] || {};
+        return {
+          code: it.item_code,
+          name: it.item_name,
+          status: it.has_expiry ? medStatus(a.expiry) : (it.numeric_input ? 'OK' : a.status || null),
+          expiryDate: a.expiry || null,
+          amount: it.numeric_input ? (a.amount || '') : null,
+          note: [a.note, a.photo ? `แนบรูปถ่ายแล้ว${it.unit ? '' : ''}` : ''].filter(Boolean).join(' · '),
+        };
+      }),
+    });
+    setSubmitting(false);
+    if (result.error) setSubmitError(result.error); else onDone();
+  };
+
+  if (loading) {
+    return (
+      <div className="screen">
+        <TopBar title={moduleLabel} onBack={onBack} />
+        <main className="form-body"><div className="empty-state">กำลังโหลดรายการตรวจสอบ...</div></main>
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="screen">
+        <TopBar title={moduleLabel} onBack={onBack} />
+        <main className="form-body"><div className="form-error">โหลดรายการไม่สำเร็จ: {loadError}</div></main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={onBack} />
+      <main className="form-body">
+        <div className="checklist">
+          {items.map((it) => {
+            if (it.is_header) {
+              return <div className="checklist-header" key={it.id}>{it.item_name}</div>;
+            }
+            const a = answers[it.id] || {};
+            return (
+              <div className="checklist-row" key={it.id}>
+                <div className="checklist-content">
+                  <div className="checklist-item-label">{it.item_name}</div>
+                  {it.standard_qty && <div className="checklist-standard">มาตรฐาน: {it.standard_qty}</div>}
+                  {it.reminder_note && <div className="reminder-banner">🔔 {it.reminder_note}</div>}
+
+                  {it.has_expiry && (
+                    <div className="med-row">
+                      <input type="date" className="text-input" value={a.expiry || ''} onChange={(e) => setAnswer(it.id, { expiry: e.target.value })} />
+                      <span className={`med-status-pill ${medStatusClass[medStatus(a.expiry)]}`}>{medStatusLabel[medStatus(a.expiry)]}</span>
+                    </div>
+                  )}
+
+                  {it.numeric_input && (
+                    <div className="med-row">
+                      <input type="number" className="text-input" placeholder="จำนวน" value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                      {it.unit && <span className="unit-label">{it.unit}</span>}
+                    </div>
+                  )}
+
+                  {!it.has_expiry && !it.numeric_input && (
+                    <div className="status-buttons">
+                      <button type="button" className={`status-btn status-ok ${a.status === 'OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'OK' })}>
+                        {it.status_label_ok || 'พร้อมใช้'}
+                      </button>
+                      <button type="button" className={`status-btn status-not-ok ${a.status === 'NOT_OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'NOT_OK' })}>
+                        {it.status_label_bad || 'ไม่พร้อมใช้'}
+                      </button>
+                    </div>
+                  )}
+
+                  {a.status === 'NOT_OK' && !it.has_expiry && !it.numeric_input && (
+                    <input type="text" className="text-input note-input" placeholder="ระบุปัญหาที่พบ" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
+                  )}
+
+                  {it.photo_attach && (
+                    <button type="button" className={`photo-btn ${a.photo ? 'photo-btn-active' : ''}`} onClick={() => setAnswer(it.id, { photo: !a.photo })}>
+                      {a.photo ? '📷 แนบรูปถ่ายแล้ว' : '📷 แนบรูปถ่าย'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {rows.length === 0 && <div className="empty-state">ยังไม่มีรายการตรวจสอบสำหรับหมวดนี้</div>}
+        </div>
+
+        {rows.length > 0 && (
+          <>
+            <div className="summary-bar">
+              <span>สรุปผล</span>
+              <span className={`summary-value ${overallStatus === 'READY' ? 'summary-ok' : 'summary-not-ok'}`}>
+                {overallStatus === 'READY' ? 'พร้อมใช้งาน' : `ไม่พร้อมใช้งาน (${problemCount} รายการ)`}
+              </span>
+            </div>
+            {submitError && <div className="form-error">{submitError}</div>}
+            <button className="btn-primary" disabled={!allAnswered || submitting} onClick={handleSubmit}>
+              {submitting ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบ'}
+            </button>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function SuccessScreen({ onBackToMenu }) {
+  return (
+    <div className="screen center">
+      <div className="auth-card">
+        <div className="success-check">✓</div>
+        <h1 className="auth-title">บันทึกผลสำเร็จ</h1>
+        <p className="auth-subtitle">ข้อมูลการตรวจสอบถูกบันทึกเรียบร้อยแล้ว</p>
+        <button className="btn-primary" style={{ marginTop: 24 }} onClick={onBackToMenu}>กลับสู่เมนูหลัก</button>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// Workspace รถพยาบาล — เลือกคันรถ > เมนูย่อย 4 โมดูล > ฟอร์ม
+// -------------------------------------------------------------------------
+function AmbulanceWorkspace({ locations, user, onExit }) {
+  const [vehicle, setVehicle] = useState(null);
+  const [module, setModule] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  if (saved) {
+    return <SuccessScreen onBackToMenu={() => { setSaved(false); setModule(null); }} />;
+  }
+  if (!vehicle) {
+    return <LocationPicker categoryMeta={CATEGORY_META.AMBULANCE} locations={locations} onSelectLocation={setVehicle} onBack={onExit} />;
+  }
+  if (!module) {
+    return <ModuleMenu vehicle={vehicle} onSelectModule={setModule} onBack={() => setVehicle(null)} />;
+  }
+  const onBack = () => setModule(null);
+  const onSaved = () => setSaved(true);
+
+  if (module.id === 'daily') return <DailyLogModule vehicle={vehicle} user={user} onBack={onBack} onSaved={onSaved} />;
+  return (
+    <DynamicChecklistForm
+      locationCode={vehicle.code}
+      moduleKey={module.moduleKey}
+      moduleLabel={`${module.label} — ${vehicle.label}`}
+      user={user}
+      onBack={onBack}
+      onDone={onSaved}
+    />
+  );
+}
+
+// -------------------------------------------------------------------------
+// Workspace ทั่วไป — สำหรับหมวดที่ไม่ใช่รถพยาบาล (กระเป๋ายา/กระเป๋าฉุกเฉิน/Station ฯลฯ)
+// -------------------------------------------------------------------------
+function GenericWorkspace({ category, user, onExit }) {
+  const [location, setLocation] = useState(category.locations.length === 1 ? category.locations[0] : null);
+  const [moduleGroup, setModuleGroup] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  if (saved) {
+    return <SuccessScreen onBackToMenu={() => { setSaved(false); setModuleGroup(null); }} />;
+  }
+  if (!location) {
+    return <LocationPicker categoryMeta={category.meta} locations={category.locations} onSelectLocation={setLocation} onBack={onExit} />;
+  }
+  if (!moduleGroup) {
+    const backAction = category.locations.length === 1 ? onExit : () => setLocation(null);
+    return <ModuleGroupPicker location={location} user={user} onSelectModule={setModuleGroup} onBack={backAction} />;
+  }
+  return (
+    <DynamicChecklistForm
+      locationCode={location.code}
+      moduleKey={moduleGroup.moduleKey}
+      moduleLabel={`${moduleGroup.label} — ${location.label}`}
+      user={user}
+      onBack={() => setModuleGroup(null)}
+      onDone={() => setSaved(true)}
+    />
+  );
+}
+
+// -------------------------------------------------------------------------
+// App หลัก
+// -------------------------------------------------------------------------
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [activeCategory, setActiveCategory] = useState(null);
+
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setActiveCategory(null);
+  };
+
+  if (!user) return <LoginScreen onLoggedIn={setUser} />;
+
+  if (!activeCategory) {
+    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} />;
+  }
+
+  if (activeCategory.id === 'AMBULANCE') {
+    return <AmbulanceWorkspace locations={activeCategory.locations} user={user} onExit={() => setActiveCategory(null)} />;
+  }
+
+  return <GenericWorkspace category={activeCategory} user={user} onExit={() => setActiveCategory(null)} />;
+}
