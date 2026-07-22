@@ -23,13 +23,14 @@ export const AMBULANCE_MODULES = [
 
 // กลุ่ม module_key ย่อยของแต่ละ location (key = locations.code)
 // allowedRoles (ถ้าใส่ไว้) = จำกัดเฉพาะบทบาทนี้เท่านั้นที่เห็นกลุ่มนี้
+// accent (ถ้าใส่ไว้) = สีแถบซ้ายของการ์ด (ใช้ทั้งหน้าเลือกเมนูและหน้ารายการยาแต่ละตัว)
 // ADMIN ใส่ไว้ในทุกกลุ่มเสมอ เพราะ admin ต้องดูได้ทุกรายการ (แต่บันทึก/แก้ไขไม่ได้ — คุมที่ RLS + UI แยกอีกชั้น)
 export const LOCATION_MODULE_GROUPS = {
   medicine_bag: [
-    { moduleKey: 'medicine_bag_oral', label: 'ยารับประทาน' },
-    { moduleKey: 'medicine_bag_external', label: 'ยาใช้ภายนอก' },
-    { moduleKey: 'medicine_bag_injectable', label: 'ยาฉีด' },
-    { moduleKey: 'medicine_bag_highAlert', label: 'ยา High Alert Drug' },
+    { moduleKey: 'medicine_bag_oral', label: 'ยารับประทาน', accent: '#1D9A63' },
+    { moduleKey: 'medicine_bag_external', label: 'ยาใช้ภายนอก', accent: '#1D9A63' },
+    { moduleKey: 'medicine_bag_injectable', label: 'ยาฉีด', accent: '#B8760A' },
+    { moduleKey: 'medicine_bag_highAlert', label: 'ยา High Alert Drug', accent: '#D64545' },
     { moduleKey: 'medicine_bag_fluids', label: 'น้ำเกลือและเวชภัณฑ์' },
     { moduleKey: 'medicine_bag_supplies', label: 'อุปกรณ์ให้สารน้ำและทำแผล' },
     { moduleKey: 'medicine_bag_instruments', label: 'เครื่องมือตรวจร่างกายและอุปกรณ์อื่นๆ' },
@@ -85,10 +86,11 @@ export const LOCATION_MODULE_GROUPS = {
 // ป้ายชื่อหมวดใหญ่ + ลำดับที่แสดงในเมนูหลัก
 // key ต้องตรงกับค่าจริงในตาราง locations.category (ตาม constraint locations_category_check
 // ซึ่งอนุญาตแค่ 4 ค่า: AMBULANCE, FIELD_BAG, EMERGENCY_BAG, STATION)
-// FIELD_BAG ครอบคลุม 3 location ย่อย: กระเป๋ายา / กระเป๋ายาเด็ก / กระเป๋า บ.ฉุกเฉิน
+// FIELD_BAG = "กระเป๋าออกตรวจฉุกเฉิน" ครอบคลุม 3 location: กระเป๋ายา / กระเป๋าฉุกเฉิน (ภาคพื้น) / กระเป๋ายาเด็ก
+// EMERGENCY_BAG = "กระเป๋า บ.ฉุกเฉิน" (บนอากาศยาน) เดี่ยว
 export const CATEGORY_META = {
   AMBULANCE: { num: '1', label: 'รถพยาบาล', subtitle: 'ตรวจสภาพความพร้อมใช้งานของรถพยาบาล ALS', order: 1 },
-  FIELD_BAG: { num: '2', label: 'กระเป๋ายา / กระเป๋า บ.ฉุกเฉิน', subtitle: 'กระเป๋ายา, กระเป๋ายาเด็ก, กระเป๋า บ.ฉุกเฉิน', order: 2 },
-  EMERGENCY_BAG: { num: '3', label: 'กระเป๋าฉุกเฉิน', subtitle: 'ตรวจความพร้อมกระเป๋าเวชภัณฑ์ฉุกเฉิน', order: 3 },
+  FIELD_BAG: { num: '2', label: 'กระเป๋าออกตรวจฉุกเฉิน', subtitle: 'กระเป๋ายา, กระเป๋าฉุกเฉิน, กระเป๋ายาเด็ก', order: 2 },
+  EMERGENCY_BAG: { num: '3', label: 'กระเป๋า บ.ฉุกเฉิน', subtitle: 'ตรวจความพร้อมกระเป๋าฉุกเฉินบนอากาศยาน', order: 3 },
   STATION: { num: '4', label: 'Station', subtitle: 'ตรวจความพร้อมของสถานีพยาบาลประจำจุด', order: 4 },
 };

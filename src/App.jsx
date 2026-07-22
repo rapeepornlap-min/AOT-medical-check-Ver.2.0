@@ -170,9 +170,14 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
     <div className="screen">
       <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
       <main className="menu-grid">
-        {groups.map((g) => (
-          <button key={g.moduleKey} className="menu-card" onClick={() => onSelectModule(g)}>
-            <div className="menu-card-dot" />
+       {groups.map((g) => (
+          <button
+            key={g.moduleKey}
+            className="menu-card"
+            style={g.accent ? { borderLeftColor: g.accent } : undefined}
+            onClick={() => onSelectModule(g)}
+          >
+            <div className="menu-card-dot" style={g.accent ? { background: g.accent } : undefined} />
             <div className="menu-card-label">{g.label}</div>
           </button>
         ))}
@@ -252,6 +257,8 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
         <label className="field-label" style={{ marginTop: 16 }}>หมายเหตุ / ปัญหาที่พบ</label>
         <textarea className="text-input textarea" placeholder="ระบุปัญหาหรือข้อสังเกต..." value={note} onChange={(e) => setNote(e.target.value)} />
 
+        <div className="checklist-standard" style={{ marginTop: 16 }}>ผู้บันทึก: {user.name}</div>
+
         {error && <div className="form-error">{error}</div>}
         <button className="btn-primary" style={{ marginTop: 16 }} disabled={saving} onClick={handleSave}>
           {saving ? 'กำลังบันทึก...' : 'บันทึกการตรวจสอบวันนี้'}
@@ -266,7 +273,7 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
 // รองรับ: is_header (หัวข้อคั่น), has_expiry (วันหมดอายุ), numeric_input (กรอกจำนวน),
 //         photo_attach (ปุ่มแนบรูป), reminder_note (ป้ายเตือน)
 // -------------------------------------------------------------------------
-function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone }) {
+function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone, accentColor }) {
   const isReadOnly = user.role === 'ADMIN';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -357,7 +364,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
             }
             const a = answers[it.id] || {};
             return (
-              <div className="checklist-row" key={it.id}>
+              <div className="checklist-row" key={it.id} style={accentColor ? { borderLeft: `5px solid ${accentColor}` } : undefined}>
                 <div className="checklist-content">
                   <div className="checklist-item-label">{it.item_name}</div>
                   {it.standard_qty && <div className="checklist-standard">มาตรฐาน: {it.standard_qty}</div>}
@@ -413,6 +420,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                 {overallStatus === 'READY' ? 'พร้อมใช้งาน' : `ไม่พร้อมใช้งาน (${problemCount} รายการ)`}
               </span>
             </div>
+            <div className="checklist-standard" style={{ marginBottom: 10 }}>ผู้บันทึก: {user.name}</div>
             {isReadOnly ? (
               <div className="empty-state">👁 โหมดดูอย่างเดียว (Admin) — ไม่สามารถบันทึกหรือแก้ไขข้อมูลได้</div>
             ) : (
@@ -502,6 +510,7 @@ function GenericWorkspace({ category, user, onExit }) {
       user={user}
       onBack={() => setModuleGroup(null)}
       onDone={() => setSaved(true)}
+      accentColor={moduleGroup.accent}
     />
   );
 }
