@@ -51,9 +51,9 @@ export const LOCATION_MODULE_GROUPS = {
     { moduleKey: 'field_emergency_bag_defib', label: 'เครื่อง Defibrillator' },
   ],
   aircraft_bag: [
-    { moduleKey: 'aircraft_set_type1', label: 'ชุดที่ 1/1, 2/1' },
-    { moduleKey: 'aircraft_set_type2', label: 'ชุดที่ 1/2, 2/2, 3/2' },
-    { moduleKey: 'aircraft_set_type3', label: 'ชุดที่ 1/3, 2/3, 3/3' },
+    { moduleKey: 'aircraft_kit1', label: 'ชุดที่ 1' },
+    { moduleKey: 'aircraft_kit2', label: 'ชุดที่ 2' },
+    { moduleKey: 'aircraft_kit3', label: 'ชุดที่ 3' },
     { moduleKey: 'aircraft_medco', label: 'Med-Co' },
     { moduleKey: 'aircraft_care_area', label: 'Care Area' },
     { moduleKey: 'aircraft_rendezvous', label: 'Rendezvous' },
