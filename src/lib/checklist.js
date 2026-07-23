@@ -26,3 +26,20 @@ export async function getChecklistItems(moduleKey) {
   if (error) return { error: error.message };
   return { data };
 }
+/**
+ * นับจำนวนรายการ (ไม่รวมหัวข้อคั่น) ของแต่ละ module_key ที่ระบุ
+ * คืนค่าเป็น object { moduleKey: จำนวน }
+ */
+export async function getModuleItemCounts(moduleKeys) {
+  const { data, error } = await supabase
+    .from('checklist_templates')
+    .select('module_key, is_header')
+    .in('module_key', moduleKeys);
+  if (error) return { error: error.message };
+  const counts = {};
+  data.forEach((row) => {
+    if (row.is_header) return;
+    counts[row.module_key] = (counts[row.module_key] || 0) + 1;
+  });
+  return { data: counts };
+}

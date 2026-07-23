@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts } from './lib/checklist';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
+import logo from './assets/logo.png';
 
 function formatThaiDateTime(date) {
   return date.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
@@ -73,8 +74,8 @@ function LoginScreen({ onLoggedIn }) {
   return (
     <div className="screen center">
       <div className="auth-card">
-        <div className="auth-badge">AOT MEDICAL CLINIC</div>
-        <h1 className="auth-title">ตรวจสอบความพร้อมใช้งาน</h1>
+        <img src={logo} alt="AOT Airport Clinic" style={{ width: '100%', maxWidth: 260, margin: '0 auto 16px', display: 'block' }} />
+        <h1 className="auth-title">Medical Checklist</h1>
         <p className="auth-subtitle">รถพยาบาล · อุปกรณ์ · เวชภัณฑ์ · ยา</p>
         <form onSubmit={handleSubmit} className="auth-form">
           <label className="field-label" htmlFor="username">ชื่อผู้ใช้ (Username)</label>
@@ -166,11 +167,21 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
   const groups = (LOCATION_MODULE_GROUPS[location.code] || []).filter(
     (g) => !g.allowedRoles || g.allowedRoles.includes(user.role)
   );
+  const [counts, setCounts] = useState({});
+
+  useEffect(() => {
+    const keys = groups.map((g) => g.moduleKey);
+    if (keys.length === 0) return;
+    getModuleItemCounts(keys).then((res) => {
+      if (res.data) setCounts(res.data);
+    });
+  }, [location.code]);
+
   return (
     <div className="screen">
       <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
       <main className="menu-grid">
-       {groups.map((g) => (
+        {groups.map((g) => (
           <button
             key={g.moduleKey}
             className="menu-card"
@@ -178,7 +189,13 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             onClick={() => onSelectModule(g)}
           >
             <div className="menu-card-dot" style={g.accent ? { background: g.accent } : undefined} />
-            <div className="menu-card-label">{g.label}</div>
+            <div className="menu-card-label">
+              {g.warn && <span style={{ marginRight: 6 }}>⚠️</span>}
+              {g.label}
+            </div>
+            {counts[g.moduleKey] !== undefined && (
+              <div className="menu-card-subtitle">{counts[g.moduleKey]} รายการ</div>
+            )}
           </button>
         ))}
         {groups.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบในจุดนี้</div>}
@@ -367,7 +384,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
               <div className="checklist-row" key={it.id} style={accentColor ? { borderLeft: `5px solid ${accentColor}` } : undefined}>
                 <div className="checklist-content">
                   <div className="checklist-item-label">{it.item_name}</div>
-                  {it.standard_qty && <div className="checklist-standard">มาตรฐาน: {it.standard_qty}</div>}
+                  {it.standard_qty && <div className="checklist-standard">จำนวน: {it.standard_qty}</div>}
                   {it.reminder_note && <div className="reminder-banner">🔔 {it.reminder_note}</div>}
 
                  {it.has_expiry && (

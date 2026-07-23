@@ -30,7 +30,7 @@ export const LOCATION_MODULE_GROUPS = {
     { moduleKey: 'medicine_bag_oral', label: 'ยารับประทาน', accent: '#1D9A63' },
     { moduleKey: 'medicine_bag_external', label: 'ยาใช้ภายนอก', accent: '#1D9A63' },
     { moduleKey: 'medicine_bag_injectable', label: 'ยาฉีด', accent: '#B8760A' },
-    { moduleKey: 'medicine_bag_highAlert', label: 'ยา High Alert Drug', accent: '#D64545' },
+    { moduleKey: 'medicine_bag_highAlert', label: 'ยา High Alert Drug', accent: '#D64545', warn: true },
     { moduleKey: 'medicine_bag_fluids', label: 'น้ำเกลือและเวชภัณฑ์' },
     { moduleKey: 'medicine_bag_supplies', label: 'อุปกรณ์ให้สารน้ำและทำแผล' },
     { moduleKey: 'medicine_bag_instruments', label: 'เครื่องมือตรวจร่างกายและอุปกรณ์อื่นๆ' },
