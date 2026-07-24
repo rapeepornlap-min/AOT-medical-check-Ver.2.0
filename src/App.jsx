@@ -622,7 +622,7 @@ function DashboardScreen({ onBack }) {
   return (
     <div className="screen">
       <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
-      <main className="form-body">
+      <main className="form-body dashboard-wide">
         <div className="dash-period-tabs">
           {PERIOD_OPTIONS.map((p) => (
             <button key={p.key} className={`dash-period-tab ${period === p.key ? 'dash-period-tab-active' : ''}`} onClick={() => setPeriod(p.key)}>
