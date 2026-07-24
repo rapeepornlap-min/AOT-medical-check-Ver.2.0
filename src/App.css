@@ -273,3 +273,9 @@ body {
   .dash-category-grid { grid-template-columns: repeat(4, 1fr); }
   .dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
 }
+.dash-period-tabs { justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dash-pdf-btn {
+  background: var(--navy); color: #fff; border: none; font-family: inherit;
+  font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+}
+.dash-pdf-btn:hover { background: var(--navy-dark); }

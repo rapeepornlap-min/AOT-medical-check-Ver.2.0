@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance } from './lib/checklist';
+import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -630,12 +631,15 @@ function DashboardScreen({ onBack }) {
     <div className="screen">
       <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
       <main className="form-body dashboard-wide">
-        <div className="dash-period-tabs">
-          {PERIOD_OPTIONS.map((p) => (
-            <button key={p.key} className={`dash-period-tab ${period === p.key ? 'dash-period-tab-active' : ''}`} onClick={() => setPeriod(p.key)}>
-              {p.label}
-            </button>
-          ))}
+        <div className="dash-period-tabs" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {PERIOD_OPTIONS.map((p) => (
+              <button key={p.key} className={`dash-period-tab ${period === p.key ? 'dash-period-tab-active' : ''}`} onClick={() => setPeriod(p.key)}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <button className="dash-pdf-btn" onClick={() => generateMonthlyReportPDF()}>📄 ดาวน์โหลดรายงานเดือนนี้ (PDF)</button>
         </div>
 
         {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
