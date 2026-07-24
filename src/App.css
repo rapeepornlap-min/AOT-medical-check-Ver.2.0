@@ -279,3 +279,5 @@ body {
   font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer;
 }
 .dash-pdf-btn:hover { background: var(--navy-dark); }
+.dash-pdf-btn-outline { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
+.dash-pdf-btn-outline:hover { background: var(--cyan-light); }

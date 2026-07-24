@@ -96,3 +96,28 @@ export async function getAmbulanceCompliance() {
   if (error) return { error: error.message };
   return { data };
 }
+/**
+ * รายละเอียดทุกรายการที่ตรวจในช่วงเวลาที่กำหนด (สำหรับรายงานละเอียด)
+ */
+export async function getFullDetailByPeriod(periodStart) {
+  const { data, error } = await supabase.rpc('dashboard_full_detail_by_period', {
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * ปฏิทินตรวจประจำวัน/สัปดาห์ ของเดือนที่ระบุ (สำหรับรายงานปฏิทินการตรวจ)
+ */
+export async function getDailyCalendar(year, month) {
+  const { data, error } = await supabase.rpc('dashboard_daily_calendar', { p_year: year, p_month: month });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+export async function getWeeklyCalendar(year, month) {
+  const { data, error } = await supabase.rpc('dashboard_weekly_calendar', { p_year: year, p_month: month });
+  if (error) return { error: error.message };
+  return { data };
+}

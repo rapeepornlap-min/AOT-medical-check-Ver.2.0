@@ -3,6 +3,8 @@ import { loginWithUsername, logout } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
+import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
+import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -639,7 +641,11 @@ function DashboardScreen({ onBack }) {
               </button>
             ))}
           </div>
-          <button className="dash-pdf-btn" onClick={() => generateMonthlyReportPDF()}>📄 ดาวน์โหลดรายงานเดือนนี้ (PDF)</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="dash-pdf-btn" onClick={() => generateMonthlyReportPDF()}>📄 รายงานสรุป</button>
+            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateDetailedMonthlyReportPDF()}>📋 รายงานละเอียด</button>
+            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+          </div>
         </div>
 
         {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
