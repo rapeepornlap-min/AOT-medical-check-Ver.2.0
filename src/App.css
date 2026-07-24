@@ -248,10 +248,24 @@ body {
 .pill-warn { background: var(--warn-bg); color: var(--warn); }
 .pill-danger { background: var(--not-ok-bg); color: var(--not-ok); }
 .dash-category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.dash-category-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
-.mini-donut { width: 36px; height: 36px; border-radius: 50%; margin-bottom: 8px; }
-.dash-category-label { font-size: 13px; font-weight: 600; color: var(--navy); }
-.dash-category-sub { font-size: 12px; color: var(--text-dim); }
+.dash-category-card {
+  background: linear-gradient(160deg, #16345F 0%, var(--navy) 100%);
+  border: none; border-radius: 14px; padding: 16px;
+  box-shadow: 0 6px 16px rgba(15, 41, 84, 0.25);
+}
+.dash-category-icon { font-size: 20px; margin-bottom: 6px; }
+.mini-donut {
+  width: 44px; height: 44px; border-radius: 50%; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 14px rgba(79, 209, 165, 0.45);
+}
+.mini-donut-center {
+  width: 30px; height: 30px; border-radius: 50%; background: #16345F;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: #fff;
+}
+.dash-category-label { font-size: 12.5px; font-weight: 600; color: #fff; }
+.dash-category-sub { font-size: 11px; color: #A8C0DE; margin-top: 2px; }
 
 /* จอ PC: Dashboard กว้างขึ้น + จัดคอลัมน์ให้ใช้พื้นที่จอคุ้มค่า */
 @media (min-width: 900px) {

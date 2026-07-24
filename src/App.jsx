@@ -488,7 +488,11 @@ function periodStartDate(key) {
 const CATEGORY_LABELS = { AMBULANCE: 'รถพยาบาล', FIELD_BAG: 'กระเป๋าออกตรวจฉุกเฉิน', EMERGENCY_BAG: 'กระเป๋า บ.ฉุกเฉิน', STATION: 'Station' };
 
 function MiniDonut({ pct }) {
-  return <div className="mini-donut" style={{ background: `conic-gradient(#1D9A63 0% ${pct}%, #D64545 ${pct}% 100%)` }} />;
+  return (
+    <div className="mini-donut" style={{ background: `conic-gradient(#4FD1A5 0% ${pct}%, rgba(255,255,255,0.18) ${pct}% 100%)` }}>
+      <div className="mini-donut-center">{pct}%</div>
+    </div>
+  );
 }
 
 function OverallReadinessCard({ summary, periodLabel }) {
@@ -533,6 +537,8 @@ function ComplianceStrip({ compliance }) {
   );
 }
 
+const CATEGORY_ICONS = { AMBULANCE: '🚑', FIELD_BAG: '🎒', EMERGENCY_BAG: '🛩️', STATION: '🏥' };
+
 function CategoryGrid({ summary }) {
   return (
     <div className="dash-category-grid">
@@ -541,6 +547,7 @@ function CategoryGrid({ summary }) {
         const pct = total > 0 ? Math.round((Number(row.ready_count) / total) * 100) : 0;
         return (
           <div className="dash-category-card" key={row.category}>
+            <div className="dash-category-icon">{CATEGORY_ICONS[row.category] || '📍'}</div>
             <MiniDonut pct={pct} />
             <div className="dash-category-label">{CATEGORY_LABELS[row.category] || row.category}</div>
             <div className="dash-category-sub">{total > 0 ? `${row.ready_count}/${total} พร้อมใช้` : 'ไม่มีข้อมูล'}</div>
