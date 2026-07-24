@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getCategoryReadinessSummary, getExpiringItems } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance } from './lib/checklist';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -462,37 +462,103 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     </div>
   );
 }
-function ReadinessPieChart({ summary }) {
+const PERIOD_OPTIONS = [
+  { key: 'today', label: 'วันนี้' },
+  { key: 'week', label: 'สัปดาห์นี้' },
+  { key: 'month', label: 'เดือนนี้' },
+  { key: 'all', label: 'ทั้งหมด' },
+];
+
+function periodStartDate(key) {
+  const now = new Date();
+  if (key === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  if (key === 'week') {
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday).toISOString();
+  }
+  if (key === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  return null;
+}
+
+const CATEGORY_LABELS = { AMBULANCE: 'รถพยาบาล', FIELD_BAG: 'กระเป๋าออกตรวจฉุกเฉิน', EMERGENCY_BAG: 'กระเป๋า บ.ฉุกเฉิน', STATION: 'Station' };
+
+function MiniDonut({ pct }) {
+  return <div className="mini-donut" style={{ background: `conic-gradient(#1D9A63 0% ${pct}%, #D64545 ${pct}% 100%)` }} />;
+}
+
+function OverallReadinessCard({ summary, periodLabel }) {
   const totalReady = summary.reduce((s, r) => s + Number(r.ready_count), 0);
   const totalNotReady = summary.reduce((s, r) => s + Number(r.not_ready_count), 0);
   const total = totalReady + totalNotReady;
-  const readyPct = total > 0 ? (totalReady / total) * 100 : 0;
-  const gradient = `conic-gradient(#1D9A63 0% ${readyPct}%, #D64545 ${readyPct}% 100%)`;
+  const readyPct = total > 0 ? Math.round((totalReady / total) * 100) : 0;
+  const gradient = total > 0 ? `conic-gradient(#1D9A63 0% ${readyPct}%, #D64545 ${readyPct}% 100%)` : `#8797AE`;
 
   return (
-    <div className="dashboard-pie-wrap">
-      <div className="dashboard-pie" style={{ background: gradient }}>
-        <div className="dashboard-pie-center">
-          <div className="dashboard-pie-pct">{total > 0 ? Math.round(readyPct) : 0}%</div>
-          <div className="dashboard-pie-label">พร้อมใช้</div>
+    <div className="dash-overall-card">
+      <div>
+        <div className="dash-overall-caption">ความพร้อมใช้งาน ({periodLabel})</div>
+        <div className="dash-overall-pct">{total > 0 ? `${readyPct}%` : 'ไม่มีข้อมูล'}</div>
+        <div className="dash-overall-detail">
+          {total > 0 ? `${totalReady} พร้อมใช้ · ${totalNotReady} ไม่พร้อมใช้ จาก ${total} จุดที่ตรวจ` : 'ยังไม่มีการตรวจสอบในช่วงนี้'}
         </div>
       </div>
-      <div className="dashboard-pie-legend">
-        <div><span className="legend-dot" style={{ background: '#1D9A63' }} /> พร้อมใช้ ({totalReady})</div>
-        <div><span className="legend-dot" style={{ background: '#D64545' }} /> ไม่พร้อมใช้ ({totalNotReady})</div>
+      <div className="dash-overall-donut-wrap" style={{ background: gradient }}>
+        <div className="dash-overall-donut-center">{total > 0 ? `${readyPct}%` : '–'}</div>
       </div>
     </div>
   );
 }
 
-function CategoryBreakdownList({ summary }) {
-  const labels = { AMBULANCE: 'รถพยาบาล', FIELD_BAG: 'กระเป๋าออกตรวจฉุกเฉิน', EMERGENCY_BAG: 'กระเป๋า บ.ฉุกเฉิน', STATION: 'Station' };
+function ComplianceStrip({ compliance }) {
+  const labels = { ambulance_daily: 'ตรวจประจำวัน (รถพยาบาล) วันนี้', ambulance_weekly: 'ตรวจประจำสัปดาห์ (รถพยาบาล) สัปดาห์นี้' };
   return (
-    <div className="dashboard-category-list">
-      {summary.map((row) => (
-        <div className="dashboard-category-row" key={row.category}>
-          <span>{labels[row.category] || row.category}</span>
-          <span>{row.ready_count}/{row.total_count} พร้อมใช้</span>
+    <div className="dash-compliance-list">
+      {compliance.map((row) => {
+        const complete = row.total_count > 0 && row.done_count >= row.total_count;
+        return (
+          <div className="dash-compliance-row" key={row.module_key}>
+            <span>{labels[row.module_key] || row.module_key}</span>
+            <span className={`dash-pill ${complete ? 'pill-ok' : 'pill-warn'}`}>
+              {complete ? `ครบ ${row.done_count}/${row.total_count} คัน` : `ยังขาด ${row.total_count - row.done_count}/${row.total_count} คัน`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CategoryGrid({ summary }) {
+  return (
+    <div className="dash-category-grid">
+      {summary.map((row) => {
+        const total = Number(row.ready_count) + Number(row.not_ready_count);
+        const pct = total > 0 ? Math.round((Number(row.ready_count) / total) * 100) : 0;
+        return (
+          <div className="dash-category-card" key={row.category}>
+            <MiniDonut pct={pct} />
+            <div className="dash-category-label">{CATEGORY_LABELS[row.category] || row.category}</div>
+            <div className="dash-category-sub">{total > 0 ? `${row.ready_count}/${total} พร้อมใช้` : 'ไม่มีข้อมูล'}</div>
+          </div>
+        );
+      })}
+      {summary.length === 0 && <div className="empty-state">ยังไม่มีข้อมูลในช่วงเวลานี้</div>}
+    </div>
+  );
+}
+
+function NotReadyList({ items }) {
+  if (items.length === 0) return <div className="empty-state">ไม่มีจุดที่ต้องแก้ไขในช่วงเวลานี้</div>;
+  return (
+    <div className="dash-notready-list">
+      {items.map((it, idx) => (
+        <div className="dash-notready-row" key={idx}>
+          <div>
+            <div className="dash-notready-name">{it.location_label} · {it.module_key}</div>
+            <div className="dash-notready-sub">{it.problem_count} รายการไม่พร้อมใช้</div>
+          </div>
+          <span className="dash-pill pill-danger">ไม่พร้อมใช้</span>
         </div>
       ))}
     </div>
@@ -517,34 +583,62 @@ function ExpiringAlertsList({ items }) {
 }
 
 function DashboardScreen({ onBack }) {
+  const [period, setPeriod] = useState('today');
   const [summary, setSummary] = useState([]);
+  const [notReady, setNotReady] = useState([]);
+  const [compliance, setCompliance] = useState([]);
   const [expiring, setExpiring] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     (async () => {
-      const [sumRes, expRes] = await Promise.all([getCategoryReadinessSummary(), getExpiringItems()]);
-      if (sumRes.error || expRes.error) setLoadError(sumRes.error || expRes.error);
+      setLoading(true);
+      const start = periodStartDate(period);
+      const [sumRes, notReadyRes, compRes, expRes] = await Promise.all([
+        getReadinessByPeriod(start),
+        getNotReadyByPeriod(start),
+        getAmbulanceCompliance(),
+        getExpiringItems(),
+      ]);
+      const err = sumRes.error || notReadyRes.error || compRes.error || expRes.error;
+      if (err) setLoadError(err);
       else {
         setSummary(sumRes.data || []);
+        setNotReady(notReadyRes.data || []);
+        setCompliance(compRes.data || []);
         setExpiring(expRes.data || []);
       }
       setLoading(false);
     })();
-  }, []);
+  }, [period]);
+
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || '';
 
   return (
     <div className="screen">
       <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
       <main className="form-body">
+        <div className="dash-period-tabs">
+          {PERIOD_OPTIONS.map((p) => (
+            <button key={p.key} className={`dash-period-tab ${period === p.key ? 'dash-period-tab-active' : ''}`} onClick={() => setPeriod(p.key)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
         {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
         {!loading && !loadError && (
           <>
-            <ReadinessPieChart summary={summary} />
-            <CategoryBreakdownList summary={summary} />
-            <h3 style={{ marginTop: 24, marginBottom: 12 }}>รายการใกล้หมดอายุ / หมดอายุ</h3>
+            <OverallReadinessCard summary={summary} periodLabel={periodLabel} />
+            <h3 className="dash-section-title">ความครบถ้วนของการตรวจตามรอบ</h3>
+            <ComplianceStrip compliance={compliance} />
+            <h3 className="dash-section-title">แยกตามหมวด</h3>
+            <CategoryGrid summary={summary} />
+            <h3 className="dash-section-title">รายจุดที่ยังไม่พร้อมใช้ ({periodLabel})</h3>
+            <NotReadyList items={notReady} />
+            <h3 className="dash-section-title">รายการใกล้หมดอายุ / หมดอายุ</h3>
             <ExpiringAlertsList items={expiring} />
           </>
         )}
@@ -552,7 +646,6 @@ function DashboardScreen({ onBack }) {
     </div>
   );
 }
-function SuccessScreen({ onBackToMenu }) {
   return (
     <div className="screen center">
       <div className="auth-card">
@@ -630,3 +723,26 @@ export default function App() {
 
   return <GenericWorkspace category={activeCategory} user={user} onExit={() => setActiveCategory(null)} />;
 }
+.dash-period-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.dash-period-tab { background: #f5f7fa; color: #666; border: 1px solid #e2e6ec; font-size: 13px; padding: 7px 16px; border-radius: 100px; }
+.dash-period-tab-active { background: #1B3A6B; color: #fff; border-color: #1B3A6B; }
+.dash-overall-card { background: #1B3A6B; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.dash-overall-caption { font-size: 13px; color: #A8C0DE; margin-bottom: 4px; }
+.dash-overall-pct { font-size: 30px; font-weight: 700; color: #fff; }
+.dash-overall-detail { font-size: 13px; color: #A8C0DE; margin-top: 4px; }
+.dash-overall-donut-wrap { width: 88px; height: 88px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.dash-overall-donut-center { width: 62px; height: 62px; border-radius: 50%; background: #1B3A6B; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; }
+.dash-section-title { font-size: 15px; font-weight: 600; color: #1B3A6B; margin: 20px 0 10px; }
+.dash-compliance-list, .dash-notready-list { display: flex; flex-direction: column; gap: 8px; }
+.dash-compliance-row, .dash-notready-row { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 10px 14px; }
+.dash-notready-name { font-weight: 600; color: #1B3A6B; font-size: 14px; }
+.dash-notready-sub { font-size: 12px; color: #888; }
+.dash-pill { font-size: 12px; padding: 3px 10px; border-radius: 100px; }
+.pill-ok { background: #EAF3DE; color: #27500A; }
+.pill-warn { background: #FAEEDA; color: #633806; }
+.pill-danger { background: #FCEBEB; color: #791F1F; }
+.dash-category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.dash-category-card { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 14px; }
+.mini-donut { width: 36px; height: 36px; border-radius: 50%; margin-bottom: 8px; }
+.dash-category-label { font-size: 13px; font-weight: 600; color: #1B3A6B; }
+.dash-category-sub { font-size: 12px; color: #888; }

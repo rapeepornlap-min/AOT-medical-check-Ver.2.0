@@ -65,3 +65,34 @@ export async function getExpiringItems() {
   if (error) return { error: error.message };
   return { data };
 }
+/**
+ * ความพร้อมใช้งานแยกตาม category กรองตามช่วงเวลา
+ * periodStart: ISO string ของจุดเริ่มต้นช่วงเวลา, หรือ null = ทั้งหมด (ไม่กรอง)
+ */
+export async function getReadinessByPeriod(periodStart) {
+  const { data, error } = await supabase.rpc('dashboard_readiness_by_period', {
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * รายจุดที่ไม่พร้อมใช้ ในช่วงเวลาที่กำหนด
+ */
+export async function getNotReadyByPeriod(periodStart) {
+  const { data, error } = await supabase.rpc('dashboard_not_ready_by_period', {
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * ความครบถ้วนของการตรวจรถพยาบาลตามรอบ (ประจำวัน/ประจำสัปดาห์)
+ */
+export async function getAmbulanceCompliance() {
+  const { data, error } = await supabase.rpc('dashboard_ambulance_compliance');
+  if (error) return { error: error.message };
+  return { data };
+}
