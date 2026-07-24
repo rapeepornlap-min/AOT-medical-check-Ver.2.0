@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { loginWithUsername, logout } from './lib/auth';
+import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
@@ -98,7 +98,7 @@ function LoginScreen({ onLoggedIn }) {
 // -------------------------------------------------------------------------
 // เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
 // -------------------------------------------------------------------------
-function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
+function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenChangePassword }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -126,6 +126,9 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
   return (
     <div className="screen">
       <TopBar title="AOT MEDICAL CLINIC" sub={`${user.name} · ${ROLES[user.role]?.label || user.role}`} onBack={onLogout} backLabel="ออกจากระบบ" />
+      <div style={{ padding: '0 24px', maxWidth: 640, margin: '12px auto 0', width: '100%' }}>
+        <button className="btn-ghost-navy" onClick={onOpenChangePassword}>🔑 เปลี่ยนรหัสผ่าน</button>
+      </div>
       <main className="menu-grid">
         {loading && <div className="empty-state">กำลังโหลดรายการ...</div>}
         {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
@@ -667,7 +670,69 @@ function DashboardScreen({ onBack }) {
     </div>
   );
 }
+function ChangePasswordScreen({ user, onBack }) {
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
+  const handleSubmit = async () => {
+    setError('');
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('รหัสผ่านใหม่และรหัสยืนยันไม่ตรงกัน');
+      return;
+    }
+    setSaving(true);
+    const result = await changePassword(user.username, oldPassword, newPassword);
+    setSaving(false);
+    if (result.error) { setError(result.error); return; }
+    setSuccess(true);
+  };
+
+  if (success) {
+    return (
+      <div className="screen center">
+        <div className="auth-card">
+          <div className="success-check">✓</div>
+          <h1 className="auth-title">เปลี่ยนรหัสผ่านสำเร็จ</h1>
+          <p className="auth-subtitle">ใช้รหัสผ่านใหม่ในการเข้าสู่ระบบครั้งต่อไป</p>
+          <button className="btn-primary" style={{ marginTop: 24 }} onClick={onBack}>กลับสู่เมนูหลัก</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <TopBar title="เปลี่ยนรหัสผ่าน" sub={user.name} onBack={onBack} />
+      <main className="form-body" style={{ maxWidth: 420 }}>
+        <label className="field-label">รหัสผ่านเดิม</label>
+        <input type="password" className="text-input" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} />
+
+        <label className="field-label" style={{ marginTop: 16 }}>รหัสผ่านใหม่</label>
+        <input type="password" className="text-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+
+        <label className="field-label" style={{ marginTop: 16 }}>ยืนยันรหัสผ่านใหม่</label>
+        <input type="password" className="text-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+
+        {error && <div className="form-error">{error}</div>}
+        <button className="btn-primary" style={{ marginTop: 20 }} disabled={saving} onClick={handleSubmit}>
+          {saving ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}
+        </button>
+      </main>
+    </div>
+  );
+}
 function SuccessScreen({ onBackToMenu }) {
   return (
     <div className="screen center">
@@ -752,22 +817,28 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     setUser(null);
     setActiveCategory(null);
     setShowDashboard(false);
+    setShowChangePassword(false);
   };
 
   if (!user) return <LoginScreen onLoggedIn={setUser} />;
+
+  if (showChangePassword) {
+    return <ChangePasswordScreen user={user} onBack={() => setShowChangePassword(false)} />;
+  }
 
   if (showDashboard) {
     return <DashboardScreen onBack={() => setShowDashboard(false)} />;
   }
 
   if (!activeCategory) {
-    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} />;
+    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenChangePassword={() => setShowChangePassword(true)} />;
   }
 
   if (activeCategory.id === 'AMBULANCE') {
