@@ -462,6 +462,10 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     </div>
   );
 }
+
+// -------------------------------------------------------------------------
+// Dashboard (ADMIN เท่านั้น) — สรุปความพร้อมใช้งาน กรองตามช่วงเวลา + ความครบถ้วนตามรอบ
+// -------------------------------------------------------------------------
 const PERIOD_OPTIONS = [
   { key: 'today', label: 'วันนี้' },
   { key: 'week', label: 'สัปดาห์นี้' },
@@ -646,6 +650,8 @@ function DashboardScreen({ onBack }) {
     </div>
   );
 }
+
+function SuccessScreen({ onBackToMenu }) {
   return (
     <div className="screen center">
       <div className="auth-card">
@@ -679,6 +685,36 @@ function AmbulanceWorkspace({ locations, user, onExit }) {
   const onSaved = () => setSaved(true);
 
   if (module.id === 'daily') return <DailyLogModule vehicle={vehicle} user={user} onBack={onBack} onSaved={onSaved} />;
+  return (
+    <DynamicChecklistForm
+      locationCode={vehicle.code}
+      moduleKey={module.moduleKey}
+      moduleLabel={`${module.label} — ${vehicle.label}`}
+      user={user}
+      onBack={onBack}
+      onDone={onSaved}
+    />
+  );
+}
+
+// -------------------------------------------------------------------------
+// Workspace ทั่วไป — สำหรับหมวดที่ไม่ใช่รถพยาบาล (กระเป๋ายา/กระเป๋าฉุกเฉิน/Station ฯลฯ)
+// -------------------------------------------------------------------------
+function GenericWorkspace({ category, user, onExit }) {
+  const [location, setLocation] = useState(category.locations.length === 1 ? category.locations[0] : null);
+  const [moduleGroup, setModuleGroup] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  if (saved) {
+    return <SuccessScreen onBackToMenu={() => { setSaved(false); setModuleGroup(null); }} />;
+  }
+  if (!location) {
+    return <LocationPicker categoryMeta={category.meta} locations={category.locations} onSelectLocation={setLocation} onBack={onExit} />;
+  }
+  if (!moduleGroup) {
+    const backAction = category.locations.length === 1 ? onExit : () => setLocation(null);
+    return <ModuleGroupPicker location={location} user={user} onSelectModule={setModuleGroup} onBack={backAction} />;
+  }
   return (
     <DynamicChecklistForm
       locationCode={location.code}
@@ -723,26 +759,3 @@ export default function App() {
 
   return <GenericWorkspace category={activeCategory} user={user} onExit={() => setActiveCategory(null)} />;
 }
-.dash-period-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.dash-period-tab { background: #f5f7fa; color: #666; border: 1px solid #e2e6ec; font-size: 13px; padding: 7px 16px; border-radius: 100px; }
-.dash-period-tab-active { background: #1B3A6B; color: #fff; border-color: #1B3A6B; }
-.dash-overall-card { background: #1B3A6B; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.dash-overall-caption { font-size: 13px; color: #A8C0DE; margin-bottom: 4px; }
-.dash-overall-pct { font-size: 30px; font-weight: 700; color: #fff; }
-.dash-overall-detail { font-size: 13px; color: #A8C0DE; margin-top: 4px; }
-.dash-overall-donut-wrap { width: 88px; height: 88px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.dash-overall-donut-center { width: 62px; height: 62px; border-radius: 50%; background: #1B3A6B; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #fff; }
-.dash-section-title { font-size: 15px; font-weight: 600; color: #1B3A6B; margin: 20px 0 10px; }
-.dash-compliance-list, .dash-notready-list { display: flex; flex-direction: column; gap: 8px; }
-.dash-compliance-row, .dash-notready-row { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 10px 14px; }
-.dash-notready-name { font-weight: 600; color: #1B3A6B; font-size: 14px; }
-.dash-notready-sub { font-size: 12px; color: #888; }
-.dash-pill { font-size: 12px; padding: 3px 10px; border-radius: 100px; }
-.pill-ok { background: #EAF3DE; color: #27500A; }
-.pill-warn { background: #FAEEDA; color: #633806; }
-.pill-danger { background: #FCEBEB; color: #791F1F; }
-.dash-category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.dash-category-card { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 14px; }
-.mini-donut { width: 36px; height: 36px; border-radius: 50%; margin-bottom: 8px; }
-.dash-category-label { font-size: 13px; font-weight: 600; color: #1B3A6B; }
-.dash-category-sub { font-size: 12px; color: #888; }
