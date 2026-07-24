@@ -43,3 +43,25 @@ export async function getModuleItemCounts(moduleKeys) {
   });
   return { data: counts };
 }
+/**
+ * สรุปความพร้อมใช้งานแยกตามหมวด (สำหรับ Dashboard กราฟวงกลม)
+ */
+export async function getCategoryReadinessSummary() {
+  const { data, error } = await supabase
+    .from('category_readiness_summary')
+    .select('*');
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * รายการที่ใกล้หมดอายุ/หมดอายุแล้ว (สำหรับ Dashboard แจ้งเตือน)
+ */
+export async function getExpiringItems() {
+  const { data, error } = await supabase
+    .from('expiring_items_summary')
+    .select('*')
+    .order('expiry_date');
+  if (error) return { error: error.message };
+  return { data };
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getCategoryReadinessSummary, getExpiringItems } from './lib/checklist';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -95,7 +95,7 @@ function LoginScreen({ onLoggedIn }) {
 // -------------------------------------------------------------------------
 // เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
 // -------------------------------------------------------------------------
-function MainMenu({ user, onSelectCategory, onLogout }) {
+function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -134,6 +134,14 @@ function MainMenu({ user, onSelectCategory, onLogout }) {
             <div className="menu-card-subtitle">{cat.meta.subtitle}</div>
           </button>
         ))}
+        {!loading && !loadError && user.role === 'ADMIN' && (
+          <button className="menu-card" onClick={onOpenDashboard}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-num">รายการที่ 5</div>
+            <div className="menu-card-label">Dashboard</div>
+            <div className="menu-card-subtitle">สรุปความพร้อมใช้งานภาพรวมทุกจุด</div>
+          </button>
+        )}
         {!loading && !loadError && categories.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบ</div>}
       </main>
     </div>
@@ -454,7 +462,96 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     </div>
   );
 }
+function ReadinessPieChart({ summary }) {
+  const totalReady = summary.reduce((s, r) => s + Number(r.ready_count), 0);
+  const totalNotReady = summary.reduce((s, r) => s + Number(r.not_ready_count), 0);
+  const total = totalReady + totalNotReady;
+  const readyPct = total > 0 ? (totalReady / total) * 100 : 0;
+  const gradient = `conic-gradient(#1D9A63 0% ${readyPct}%, #D64545 ${readyPct}% 100%)`;
 
+  return (
+    <div className="dashboard-pie-wrap">
+      <div className="dashboard-pie" style={{ background: gradient }}>
+        <div className="dashboard-pie-center">
+          <div className="dashboard-pie-pct">{total > 0 ? Math.round(readyPct) : 0}%</div>
+          <div className="dashboard-pie-label">พร้อมใช้</div>
+        </div>
+      </div>
+      <div className="dashboard-pie-legend">
+        <div><span className="legend-dot" style={{ background: '#1D9A63' }} /> พร้อมใช้ ({totalReady})</div>
+        <div><span className="legend-dot" style={{ background: '#D64545' }} /> ไม่พร้อมใช้ ({totalNotReady})</div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryBreakdownList({ summary }) {
+  const labels = { AMBULANCE: 'รถพยาบาล', FIELD_BAG: 'กระเป๋าออกตรวจฉุกเฉิน', EMERGENCY_BAG: 'กระเป๋า บ.ฉุกเฉิน', STATION: 'Station' };
+  return (
+    <div className="dashboard-category-list">
+      {summary.map((row) => (
+        <div className="dashboard-category-row" key={row.category}>
+          <span>{labels[row.category] || row.category}</span>
+          <span>{row.ready_count}/{row.total_count} พร้อมใช้</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExpiringAlertsList({ items }) {
+  if (items.length === 0) return <div className="empty-state">ไม่มีรายการใกล้หมดอายุ</div>;
+  return (
+    <div className="dashboard-expiring-list">
+      {items.map((it, idx) => (
+        <div className="dashboard-expiring-row" key={idx}>
+          <div className="dashboard-expiring-name">{it.item_name}</div>
+          <div className="dashboard-expiring-loc">{it.location_label}</div>
+          <span className={`med-status-pill ${it.status === 'EXPIRED' ? 'med-status-expired' : 'med-status-near'}`}>
+            {it.status === 'EXPIRED' ? 'หมดอายุแล้ว' : 'ใกล้หมดอายุ'} · {it.expiry_date}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DashboardScreen({ onBack }) {
+  const [summary, setSummary] = useState([]);
+  const [expiring, setExpiring] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const [sumRes, expRes] = await Promise.all([getCategoryReadinessSummary(), getExpiringItems()]);
+      if (sumRes.error || expRes.error) setLoadError(sumRes.error || expRes.error);
+      else {
+        setSummary(sumRes.data || []);
+        setExpiring(expRes.data || []);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <div className="screen">
+      <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
+      <main className="form-body">
+        {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
+        {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
+        {!loading && !loadError && (
+          <>
+            <ReadinessPieChart summary={summary} />
+            <CategoryBreakdownList summary={summary} />
+            <h3 style={{ marginTop: 24, marginBottom: 12 }}>รายการใกล้หมดอายุ / หมดอายุ</h3>
+            <ExpiringAlertsList items={expiring} />
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
 function SuccessScreen({ onBackToMenu }) {
   return (
     <div className="screen center">
@@ -491,36 +588,6 @@ function AmbulanceWorkspace({ locations, user, onExit }) {
   if (module.id === 'daily') return <DailyLogModule vehicle={vehicle} user={user} onBack={onBack} onSaved={onSaved} />;
   return (
     <DynamicChecklistForm
-      locationCode={vehicle.code}
-      moduleKey={module.moduleKey}
-      moduleLabel={`${module.label} — ${vehicle.label}`}
-      user={user}
-      onBack={onBack}
-      onDone={onSaved}
-    />
-  );
-}
-
-// -------------------------------------------------------------------------
-// Workspace ทั่วไป — สำหรับหมวดที่ไม่ใช่รถพยาบาล (กระเป๋ายา/กระเป๋าฉุกเฉิน/Station ฯลฯ)
-// -------------------------------------------------------------------------
-function GenericWorkspace({ category, user, onExit }) {
-  const [location, setLocation] = useState(category.locations.length === 1 ? category.locations[0] : null);
-  const [moduleGroup, setModuleGroup] = useState(null);
-  const [saved, setSaved] = useState(false);
-
-  if (saved) {
-    return <SuccessScreen onBackToMenu={() => { setSaved(false); setModuleGroup(null); }} />;
-  }
-  if (!location) {
-    return <LocationPicker categoryMeta={category.meta} locations={category.locations} onSelectLocation={setLocation} onBack={onExit} />;
-  }
-  if (!moduleGroup) {
-    const backAction = category.locations.length === 1 ? onExit : () => setLocation(null);
-    return <ModuleGroupPicker location={location} user={user} onSelectModule={setModuleGroup} onBack={backAction} />;
-  }
-  return (
-    <DynamicChecklistForm
       locationCode={location.code}
       moduleKey={moduleGroup.moduleKey}
       moduleLabel={`${moduleGroup.label} — ${location.label}`}
@@ -538,17 +605,23 @@ function GenericWorkspace({ category, user, onExit }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     setUser(null);
     setActiveCategory(null);
+    setShowDashboard(false);
   };
 
   if (!user) return <LoginScreen onLoggedIn={setUser} />;
 
+  if (showDashboard) {
+    return <DashboardScreen onBack={() => setShowDashboard(false)} />;
+  }
+
   if (!activeCategory) {
-    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} />;
+    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} />;
   }
 
   if (activeCategory.id === 'AMBULANCE') {
