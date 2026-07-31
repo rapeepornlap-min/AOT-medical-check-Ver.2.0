@@ -115,7 +115,8 @@ export const LOCATION_MODULE_GROUPS = {
   ],
   sat1: [
     { moduleKey: 'sat1_emt', label: 'เครื่อง/อุปกรณ์ EMR-EMT', allowedRoles: ['EMR_EMT', 'ADMIN'] },
-    { moduleKey: 'sat1_buggy', label: 'รถไฟฟ้า (รถกอล์ฟ)', allowedRoles: ['EMR_EMT', 'ADMIN'] },
+    { moduleKey: 'sat1_buggy_floor2', label: 'รถไฟฟ้า (รถกอล์ฟ) ชั้น 2', allowedRoles: ['EMR_EMT', 'ADMIN'] },
+    { moduleKey: 'sat1_buggy_floor3', label: 'รถไฟฟ้า (รถกอล์ฟ) ชั้น 3', allowedRoles: ['EMR_EMT', 'ADMIN'] },
     { moduleKey: 'sat1_nurse', label: 'ฝ่ายพยาบาล', allowedRoles: ['NURSE', 'ADMIN'] },
     { moduleKey: 'sat1_pharma_tablet', label: 'คลังยา Sat-1 · ยาเม็ด', allowedRoles: ['PHARMACIST', 'PN', 'ADMIN'] },
     { moduleKey: 'sat1_pharma_injection', label: 'คลังยา Sat-1 · ยาฉีดสามัญ', allowedRoles: ['PHARMACIST', 'PN', 'ADMIN'] },
