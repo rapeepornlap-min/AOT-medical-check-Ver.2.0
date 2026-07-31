@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
@@ -114,7 +114,7 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
 
   useEffect(() => {
     (async () => {
-      const res = await getLocationsForRole(user.role);
+      const res = await getLocationsWithResponsible(user.role);
       if (res.error) setLoadError(res.error);
       else setLocations(res.data || []);
       setLoading(false);
@@ -163,18 +163,39 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
 // -------------------------------------------------------------------------
 // เลือกสถานที่ย่อยภายในหมวด (ใช้เมื่อ category มีมากกว่า 1 location เช่น รถพยาบาล, Station)
 // -------------------------------------------------------------------------
+const STATUS_LABELS_TH = { READY: 'พร้อมใช้งาน', NOT_READY: 'ไม่พร้อมใช้งาน' };
+
 function LocationPicker({ categoryMeta, locations, onSelectLocation, onBack }) {
+  const [statusMap, setStatusMap] = useState({});
+
+  useEffect(() => {
+    const ids = locations.map((l) => l.id);
+    if (ids.length === 0) return;
+    getLatestStatusByLocation(ids).then((res) => {
+      if (res.data) setStatusMap(res.data);
+    });
+  }, [locations]);
+
   return (
     <div className="screen">
       <TopBar title={categoryMeta.label} sub="เลือกจุดที่ต้องการตรวจสอบ" onBack={onBack} />
       <main className="menu-grid">
-        {locations.map((loc, idx) => (
-          <button key={loc.id} className="menu-card" onClick={() => onSelectLocation(loc)}>
-            <div className="menu-card-dot" />
-            <div className="menu-card-num">จุดที่ {idx + 1}</div>
-            <div className="menu-card-label">{loc.label}</div>
-          </button>
-        ))}
+        {locations.map((loc) => {
+          const status = statusMap[loc.id];
+          const pillClass = status === 'READY' ? 'pill-ok' : status === 'NOT_READY' ? 'pill-danger' : 'pill-none';
+          const pillLabel = STATUS_LABELS_TH[status] || 'ยังไม่มีการตรวจ';
+          return (
+            <button key={loc.id} className="menu-card" onClick={() => onSelectLocation(loc)}>
+              <div className="menu-card-label">{loc.label}</div>
+              {loc.responsible_name && (
+                <div className="menu-card-person">👤 {loc.responsible_name}</div>
+              )}
+              <div className="menu-card-status">
+                <span className={`dash-pill ${pillClass}`}>{pillLabel}</span>
+              </div>
+            </button>
+          );
+        })}
       </main>
     </div>
   );
@@ -201,10 +222,14 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
     <div className="screen">
       <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
       <main className="menu-grid">
-        {groups.map((g) => (
+        {groups.map((g) => {
+          const tintClass = g.accent === '#1D9A63' ? 'menu-card-green'
+            : g.accent === '#B8760A' ? 'menu-card-yellow'
+            : g.accent === '#D64545' ? 'menu-card-red' : '';
+          return (
           <button
             key={g.moduleKey}
-            className="menu-card"
+            className={`menu-card ${tintClass}`}
             style={g.accent ? { borderLeftColor: g.accent } : undefined}
             onClick={() => onSelectModule(g)}
           >
@@ -216,9 +241,10 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             {counts[g.moduleKey] !== undefined && (
               <div className="menu-card-subtitle">{counts[g.moduleKey]} รายการ</div>
             )}
-          </button>
-        ))}
-        {groups.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบในจุดนี้</div>}
+        </button>
+          );
+        })}
+        {groups.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบในจุดนี้</div>}  
       </main>
     </div>
   );

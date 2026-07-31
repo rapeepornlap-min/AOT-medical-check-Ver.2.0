@@ -121,3 +121,29 @@ export async function getWeeklyCalendar(year, month) {
   if (error) return { error: error.message };
   return { data };
 }
+/**
+ * ดึง location พร้อม responsible_name (ใช้แทน getLocationsForRole เดิมตอนต้องการชื่อผู้รับผิดชอบด้วย)
+ */
+export async function getLocationsWithResponsible(role) {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, category, code, label, sort_order, allowed_roles, responsible_name')
+    .contains('allowed_roles', [role])
+    .order('sort_order');
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * ผลตรวจล่าสุดของแต่ละ location (READY/NOT_READY/ยังไม่มีข้อมูล) — ใช้ทำสถานะบนการ์ด
+ */
+export async function getLatestStatusByLocation(locationIds) {
+  const { data, error } = await supabase
+    .from('latest_inspection_per_location')
+    .select('location_id, overall_status')
+    .in('location_id', locationIds);
+  if (error) return { error: error.message };
+  const map = {};
+  data.forEach((row) => { map[row.location_id] = row.overall_status; });
+  return { data: map };
+}
