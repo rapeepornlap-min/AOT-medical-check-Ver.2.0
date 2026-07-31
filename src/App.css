@@ -329,3 +329,7 @@ body {
 .ack-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ack-card-title { font-weight: 700; color: var(--navy); font-size: 14.5px; }
 .ack-card-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.ack-problem-box {
+  margin-top: 8px; background: #FBEAEA; color: #791F1F; font-size: 12.5px;
+  padding: 8px 10px; border-radius: 8px; line-height: 1.4;
+}

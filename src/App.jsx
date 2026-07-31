@@ -871,6 +871,9 @@ function PendingAcknowledgmentsScreen({ user, onBack }) {
               </span>
             </div>
             <div className="ack-card-sub">ผู้ตรวจ: {it.inspector_name} · {formatThaiDateTime(new Date(it.submitted_at))}</div>
+            {it.problem_summary && (
+              <div className="ack-problem-box">⚠️ {it.problem_summary}</div>
+            )}
             <button className="btn-primary" style={{ marginTop: 10 }} disabled={ackingId === it.inspection_id} onClick={() => handleAck(it.inspection_id)}>
               {ackingId === it.inspection_id ? 'กำลังบันทึก...' : '✓ รับทราบ'}
             </button>
