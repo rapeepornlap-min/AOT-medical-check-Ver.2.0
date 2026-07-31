@@ -124,6 +124,7 @@ export const LOCATION_MODULE_GROUPS = {
   ],
   concg: [
     { moduleKey: 'concg_emt', label: 'เครื่อง/อุปกรณ์ EMR-EMT', allowedRoles: ['EMR_EMT', 'ADMIN'] },
+    { moduleKey: 'concg_buggy', label: 'รถไฟฟ้า (รถกอล์ฟ)', allowedRoles: ['EMR_EMT', 'ADMIN'] },
     { moduleKey: 'concg_nurse', label: 'ฝ่ายพยาบาล (Emergency Cart)', allowedRoles: ['NURSE', 'ADMIN'] },
     { moduleKey: 'auto_pulse', label: 'เครื่อง Auto Pulse', allowedRoles: ['EMR_EMT', 'ADMIN'] },
   ],
