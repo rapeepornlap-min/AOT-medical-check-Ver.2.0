@@ -147,3 +147,33 @@ export async function getLatestStatusByLocation(locationIds) {
   data.forEach((row) => { map[row.location_id] = row.overall_status; });
   return { data: map };
 }
+/**
+ * รายการที่ผู้ใช้ปัจจุบันต้องรับทราบ (คันที่ตัวเองรับผิดชอบ ยังไม่รับทราบ)
+ */
+export async function getPendingAcknowledgments() {
+  const { data, error } = await supabase.rpc('get_pending_acknowledgments');
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * บันทึกการรับทราบ
+ */
+export async function acknowledgeInspection(inspectionId, userId) {
+  const { error } = await supabase
+    .from('inspection_acknowledgments')
+    .insert({ inspection_id: inspectionId, acknowledged_by: userId });
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+/**
+ * สรุปสถานะรับทราบต่อคัน (สำหรับ Admin Dashboard)
+ */
+export async function getAcknowledgmentSummary(periodStart) {
+  const { data, error } = await supabase.rpc('get_acknowledgment_summary', {
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+  });
+  if (error) return { error: error.message };
+  return { data };
+}

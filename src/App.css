@@ -325,3 +325,7 @@ body {
 .auth-feature-ic { width: 38px !important; height: 38px !important; font-size: 15px !important; margin-bottom: 4px !important; }
 .auth-feature-title { font-size: 11px !important; }
 .auth-feature-sub { display: none; }
+.ack-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+.ack-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ack-card-title { font-weight: 700; color: var(--navy); font-size: 14.5px; }
+.ack-card-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
@@ -131,7 +131,7 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
 // -------------------------------------------------------------------------
 // เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
 // -------------------------------------------------------------------------
-function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
+function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPendingAck }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -176,6 +176,13 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard }) {
             <div className="menu-card-num">รายการที่ 5</div>
             <div className="menu-card-label">Dashboard</div>
             <div className="menu-card-subtitle">สรุปความพร้อมใช้งานภาพรวมทุกจุด</div>
+          </button>
+        )}
+        {!loading && !loadError && user.role !== 'ADMIN' && (
+          <button className="menu-card" onClick={onOpenPendingAck}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-label">🔔 รอรับทราบ</div>
+            <div className="menu-card-subtitle">การตรวจของคันที่คุณรับผิดชอบ</div>
           </button>
         )}
         {!loading && !loadError && categories.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบ</div>}
@@ -667,24 +674,27 @@ function DashboardScreen({ onBack }) {
   const [expiring, setExpiring] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [ackSummary, setAckSummary] = useState([]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const start = periodStartDate(period);
-      const [sumRes, notReadyRes, compRes, expRes] = await Promise.all([
+      const [sumRes, notReadyRes, compRes, expRes, ackRes] = await Promise.all([
         getReadinessByPeriod(start),
         getNotReadyByPeriod(start),
         getAmbulanceCompliance(),
         getExpiringItems(),
+        getAcknowledgmentSummary(start),
       ]);
-      const err = sumRes.error || notReadyRes.error || compRes.error || expRes.error;
+      const err = sumRes.error || notReadyRes.error || compRes.error || expRes.error || ackRes.error;
       if (err) setLoadError(err);
       else {
         setSummary(sumRes.data || []);
         setNotReady(notReadyRes.data || []);
         setCompliance(compRes.data || []);
         setExpiring(expRes.data || []);
+        setAckSummary(ackRes.data || []);
       }
       setLoading(false);
     })();
@@ -722,6 +732,22 @@ function DashboardScreen({ onBack }) {
             <CategoryGrid summary={summary} />
             <h3 className="dash-section-title">รายจุดที่ยังไม่พร้อมใช้ ({periodLabel})</h3>
             <NotReadyList items={notReady} />
+            <h3 className="dash-section-title">การรับทราบของผู้รับผิดชอบรถ ({periodLabel})</h3>
+            <div className="dash-notready-list">
+              {ackSummary.length === 0 && <div className="empty-state">ยังไม่มีข้อมูลในช่วงเวลานี้</div>}
+              {ackSummary.map((row) => {
+                const complete = row.total_inspections > 0 && row.acknowledged_count >= row.total_inspections;
+                return (
+                  <div className="dash-notready-row" key={row.location_label}>
+                    <div>
+                      <div className="dash-notready-name">{row.location_label} · {row.responsible_name || 'ยังไม่กำหนดผู้รับผิดชอบ'}</div>
+                      <div className="dash-notready-sub">รับทราบแล้ว {row.acknowledged_count}/{row.total_inspections} รายการ</div>
+                    </div>
+                    <span className={`dash-pill ${complete ? 'pill-ok' : 'pill-warn'}`}>{complete ? 'ครบ' : 'ยังไม่ครบ'}</span>
+                  </div>
+                );
+              })}
+            </div>
             <h3 className="dash-section-title">รายการใกล้หมดอายุ / หมดอายุ</h3>
             <ExpiringAlertsList items={expiring} />
           </>
@@ -797,6 +823,60 @@ function ChangePasswordScreen({ onBack }) {
         </button>
         <button className="btn-ghost-navy" style={{ marginTop: 12, width: '100%' }} onClick={onBack}>‹ กลับสู่หน้าเข้าสู่ระบบ</button>
       </div>
+    </div>
+  );
+}
+const MODULE_LABELS_TH = {
+  ambulance_daily: 'บันทึกประจำวัน', ambulance_weekly: 'ตรวจสภาพประจำสัปดาห์',
+  ambulance_equipment: 'รายการอุปกรณ์', ambulance_medication: 'เวชภัณฑ์',
+};
+
+function PendingAcknowledgmentsScreen({ user, onBack }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [ackingId, setAckingId] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    const res = await getPendingAcknowledgments();
+    if (res.error) setError(res.error); else setItems(res.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleAck = async (inspectionId) => {
+    setAckingId(inspectionId);
+    const res = await acknowledgeInspection(inspectionId, user.id);
+    setAckingId(null);
+    if (!res.error) load();
+  };
+
+  return (
+    <div className="screen">
+      <TopBar title="รอรับทราบ" sub="รายการตรวจของคันที่คุณรับผิดชอบ" onBack={onBack} />
+      <main className="form-body">
+        {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
+        {error && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {error}</div>}
+        {!loading && !error && items.length === 0 && (
+          <div className="empty-state">✓ รับทราบครบทุกรายการแล้ว</div>
+        )}
+        {!loading && !error && items.map((it) => (
+          <div className="ack-card" key={it.inspection_id}>
+            <div className="ack-card-top">
+              <div className="ack-card-title">{it.location_label} · {MODULE_LABELS_TH[it.module_key] || it.module_key}</div>
+              <span className={`dash-pill ${it.overall_status === 'READY' ? 'pill-ok' : 'pill-danger'}`}>
+                {it.overall_status === 'READY' ? 'พร้อมใช้งาน' : 'ไม่พร้อมใช้งาน'}
+              </span>
+            </div>
+            <div className="ack-card-sub">ผู้ตรวจ: {it.inspector_name} · {formatThaiDateTime(new Date(it.submitted_at))}</div>
+            <button className="btn-primary" style={{ marginTop: 10 }} disabled={ackingId === it.inspection_id} onClick={() => handleAck(it.inspection_id)}>
+              {ackingId === it.inspection_id ? 'กำลังบันทึก...' : '✓ รับทราบ'}
+            </button>
+          </div>
+        ))}
+      </main>
     </div>
   );
 }
@@ -885,12 +965,14 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showPendingAck, setShowPendingAck] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     setUser(null);
     setActiveCategory(null);
     setShowDashboard(false);
+    setShowPendingAck(false);
   };
 
   if (!user) {
@@ -900,12 +982,16 @@ export default function App() {
     return <LoginScreen onLoggedIn={setUser} onForgotPassword={() => setShowForgotPassword(true)} />;
   }
 
+  if (showPendingAck) {
+    return <PendingAcknowledgmentsScreen user={user} onBack={() => setShowPendingAck(false)} />;
+  }
+
   if (showDashboard) {
     return <DashboardScreen onBack={() => setShowDashboard(false)} />;
   }
 
   if (!activeCategory) {
-    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} />;
+    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} />;
   }
 
   if (activeCategory.id === 'AMBULANCE') {
