@@ -400,10 +400,14 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
               return <div className="checklist-header" key={it.id}>{it.item_name}</div>;
             }
             const a = answers[it.id] || {};
+            const rowAccent = it.is_high_alert ? '#D64545' : accentColor;
             return (
-              <div className="checklist-row" key={it.id} style={accentColor ? { borderLeft: `5px solid ${accentColor}` } : undefined}>
+              <div className={`checklist-row ${it.is_high_alert ? 'checklist-row-highalert' : ''}`} key={it.id} style={rowAccent ? { borderLeft: `5px solid ${rowAccent}` } : undefined}>
                 <div className="checklist-content">
-                  <div className="checklist-item-label">{it.item_name}</div>
+                  <div className="checklist-item-label">
+                    {it.is_high_alert && <span className="high-alert-badge">⚠️ High Alert</span>}
+                    {it.item_name}
+                  </div>
                   {it.standard_qty && <div className="checklist-standard">จำนวน: {it.standard_qty}</div>}
                   {it.reminder_note && <div className="reminder-banner">🔔 {it.reminder_note}</div>}
 
