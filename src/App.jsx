@@ -79,7 +79,7 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
     <div className="screen center">
       <div className="auth-card">
         <img src={logo} alt="AOT Airport Clinic" style={{ width: '100%', maxWidth: 260, margin: '0 auto 16px', display: 'block' }} />
-        <h1 className="auth-title">Medical Checklist</h1>
+        <h1 className="auth-title">Medical <span className="auth-title-accent">Checklist</span></h1>
         <p className="auth-subtitle">รถพยาบาล · อุปกรณ์ · เวชภัณฑ์ · ยา</p>
         <form onSubmit={handleSubmit} className="auth-form">
           <label className="field-label" htmlFor="username">ชื่อผู้ใช้ (Username)</label>
@@ -99,6 +99,30 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
             <span className="link-forgot" onClick={onForgotPassword}>🔑 เปลี่ยนรหัสผ่าน</span>
           </div>
         </form>
+
+        <div className="auth-divider">
+          <div className="auth-divider-line" />
+          <div className="auth-divider-badge">✈️</div>
+          <div className="auth-divider-line" />
+        </div>
+
+        <div className="auth-features">
+          <div className="auth-feature">
+            <div className="auth-feature-ic">🛡️</div>
+            <div className="auth-feature-title">ปลอดภัย</div>
+            <div className="auth-feature-sub">มั่นใจในความปลอดภัยของข้อมูล</div>
+          </div>
+          <div className="auth-feature">
+            <div className="auth-feature-ic">📋</div>
+            <div className="auth-feature-title">ตรวจสอบง่าย</div>
+            <div className="auth-feature-sub">เช็ครถ อุปกรณ์ ยา ได้ครบถ้วน</div>
+          </div>
+          <div className="auth-feature">
+            <div className="auth-feature-ic">🕐</div>
+            <div className="auth-feature-title">รวดเร็ว ทันเวลา</div>
+            <div className="auth-feature-sub">พร้อมใช้งานตลอด 24 ชั่วโมง</div>
+          </div>
+        </div>
       </div>
     </div>
   );
