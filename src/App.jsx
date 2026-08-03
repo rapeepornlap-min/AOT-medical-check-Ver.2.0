@@ -546,7 +546,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
 
                   {it.numeric_input && (
                     <div className="med-row">
-                      <input type="number" className="text-input" placeholder="จำนวน" value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                      <input type="text" className="text-input" style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }} placeholder="จำนวน" value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
                       {it.unit && <span className="unit-label">{it.unit}</span>}
                     </div>
                   )}
