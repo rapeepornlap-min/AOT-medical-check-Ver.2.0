@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
@@ -376,14 +376,35 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
+  const [prefilled, setPrefilled] = useState(false);
+
   useEffect(() => {
     (async () => {
       const res = await getChecklistItems(moduleKey);
-      if (res.error) setLoadError(res.error);
-      else setItems(res.data || []);
+      if (res.error) { setLoadError(res.error); setLoading(false); return; }
+      const loadedItems = res.data || [];
+      setItems(loadedItems);
+
+      const lastRes = await getLatestInspectionAnswers(locationCode, moduleKey);
+      const lastAnswers = lastRes.data || {};
+      if (Object.keys(lastAnswers).length > 0) {
+        const initial = {};
+        loadedItems.forEach((it) => {
+          const prev = lastAnswers[it.item_code];
+          if (!prev) return;
+          initial[it.id] = {
+            status: prev.status === 'OK' || prev.status === 'NOT_OK' ? prev.status : undefined,
+            expiry: prev.expiry_date || undefined,
+            amount: prev.amount != null ? String(prev.amount) : undefined,
+            note: prev.note || undefined,
+          };
+        });
+        setAnswers(initial);
+        setPrefilled(true);
+      }
       setLoading(false);
     })();
-  }, [moduleKey]);
+  }, [moduleKey, locationCode]);
 
   const rows = items.filter((it) => !it.is_header);
   const setAnswer = (id, patch) => setAnswers((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }));
@@ -451,6 +472,11 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     <div className="screen">
       <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={onBack} />
       <main className="form-body">
+        {prefilled && (
+          <div className="reminder-banner" style={{ marginBottom: 12 }}>
+            🔄 แสดงข้อมูลจากการตรวจครั้งล่าสุด กรุณาตรวจสอบและแก้ไขให้ตรงกับสภาพจริงก่อนบันทึก
+          </div>
+        )}
         <div className="checklist" style={isReadOnly ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
           {items.map((it) => {
             if (it.is_header) {

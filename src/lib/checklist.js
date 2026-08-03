@@ -27,6 +27,38 @@ export async function getChecklistItems(moduleKey) {
   return { data };
 }
 /**
+ * ดึงค่าที่บันทึกไว้ล่าสุดของ location + module หนึ่งๆ (เพื่อนำมา pre-fill ฟอร์ม)
+ * คืนค่าเป็น object { item_code: { status, expiry_date, amount, note } }
+ */
+export async function getLatestInspectionAnswers(locationCode, moduleKey) {
+  const { data: location, error: locError } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('code', locationCode)
+    .single();
+  if (locError || !location) return { data: {} };
+
+  const { data: lastInspection, error: insError } = await supabase
+    .from('inspections')
+    .select('id')
+    .eq('location_id', location.id)
+    .eq('module_key', moduleKey)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (insError || !lastInspection) return { data: {} };
+
+  const { data: items, error: itemsError } = await supabase
+    .from('inspection_items')
+    .select('item_code, status, expiry_date, amount, note')
+    .eq('inspection_id', lastInspection.id);
+  if (itemsError || !items) return { data: {} };
+
+  const map = {};
+  items.forEach((it) => { map[it.item_code] = it; });
+  return { data: map };
+}
+/**
  * นับจำนวนรายการ (ไม่รวมหัวข้อคั่น) ของแต่ละ module_key ที่ระบุ
  * คืนค่าเป็น object { moduleKey: จำนวน }
  */
