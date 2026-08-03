@@ -194,9 +194,9 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
 // -------------------------------------------------------------------------
 // เลือกสถานที่ย่อยภายในหมวด (ใช้เมื่อ category มีมากกว่า 1 location เช่น รถพยาบาล, Station)
 // -------------------------------------------------------------------------
-const STATUS_LABELS_TH = { READY: 'พร้อมใช้งาน', NOT_READY: 'ไม่พร้อมใช้งาน' };
+const STATUS_LABELS_TH = { READY: 'พร้อมใช้งาน', NOT_READY: 'ไม่พร้อมใช้งาน', PARTIAL: 'ตรวจไม่ครบ' };
 
-function LocationPicker({ categoryMeta, locations, onSelectLocation, onBack }) {
+function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLocation, onBack }) {
   const [statusMap, setStatusMap] = useState({});
 
   useEffect(() => {
@@ -207,13 +207,31 @@ function LocationPicker({ categoryMeta, locations, onSelectLocation, onBack }) {
     });
   }, [locations]);
 
+  const expectedKeysFor = (loc) => {
+    if (isAmbulance) return AMBULANCE_MODULES.filter((m) => m.moduleKey).map((m) => m.moduleKey);
+    const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
+      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role)
+    );
+    return groups.map((g) => g.moduleKey).filter(Boolean);
+  };
+
+  const statusFor = (loc) => {
+    const expected = expectedKeysFor(loc);
+    const checked = statusMap[loc.id] || {};
+    if (expected.length === 0) return undefined;
+    if (expected.some((k) => checked[k] === 'NOT_READY')) return 'NOT_READY';
+    const missing = expected.filter((k) => !(k in checked));
+    if (missing.length > 0) return Object.keys(checked).length > 0 ? 'PARTIAL' : undefined;
+    return 'READY';
+  };
+
   return (
     <div className="screen">
       <TopBar title={categoryMeta.label} sub="เลือกจุดที่ต้องการตรวจสอบ" onBack={onBack} />
       <main className="menu-grid">
         {locations.map((loc) => {
-          const status = statusMap[loc.id];
-          const pillClass = status === 'READY' ? 'pill-ok' : status === 'NOT_READY' ? 'pill-danger' : 'pill-none';
+          const status = statusFor(loc);
+          const pillClass = status === 'READY' ? 'pill-ok' : status === 'NOT_READY' ? 'pill-danger' : status === 'PARTIAL' ? 'pill-warn' : 'pill-none';
           const pillLabel = STATUS_LABELS_TH[status] || 'ยังไม่มีการตรวจ';
           return (
             <button key={loc.id} className="menu-card" onClick={() => onSelectLocation(loc)}>
@@ -934,7 +952,7 @@ function AmbulanceWorkspace({ locations, user, onExit }) {
     return <SuccessScreen onBackToMenu={() => { setSaved(false); setModule(null); }} />;
   }
   if (!vehicle) {
-    return <LocationPicker categoryMeta={CATEGORY_META.AMBULANCE} locations={locations} onSelectLocation={setVehicle} onBack={onExit} />;
+    return <LocationPicker categoryMeta={CATEGORY_META.AMBULANCE} locations={locations} user={user} isAmbulance onSelectLocation={setVehicle} onBack={onExit} />;
   }
   if (!module) {
     return <ModuleMenu vehicle={vehicle} onSelectModule={setModule} onBack={() => setVehicle(null)} />;
@@ -967,7 +985,7 @@ function GenericWorkspace({ category, user, onExit }) {
     return <SuccessScreen onBackToMenu={() => { setSaved(false); setModuleGroup(null); }} />;
   }
   if (!location) {
-    return <LocationPicker categoryMeta={category.meta} locations={category.locations} onSelectLocation={setLocation} onBack={onExit} />;
+    return <LocationPicker categoryMeta={category.meta} locations={category.locations} user={user} onSelectLocation={setLocation} onBack={onExit} />;
   }
   if (!moduleGroup) {
     const backAction = category.locations.length === 1 ? onExit : () => setLocation(null);
