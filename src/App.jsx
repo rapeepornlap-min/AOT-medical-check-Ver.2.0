@@ -561,7 +561,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                           {it.status_label_bad || 'ไม่พร้อมใช้'}
                         </button>
                       </div>
-                      {it.standard_qty && !isNaN(Number(it.standard_qty)) && (
+                      {it.standard_qty && it.standard_qty.split(',').every((n) => !isNaN(Number(n.trim())) && n.trim() !== '') && (
                         <>
                           <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
                           <div className="med-row">
