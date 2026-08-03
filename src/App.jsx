@@ -258,12 +258,16 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
     (g) => !g.allowedRoles || g.allowedRoles.includes(user.role)
   );
   const [counts, setCounts] = useState({});
+  const [moduleStatus, setModuleStatus] = useState({});
 
   useEffect(() => {
     const keys = groups.map((g) => g.moduleKey);
     if (keys.length === 0) return;
     getModuleItemCounts(keys).then((res) => {
       if (res.data) setCounts(res.data);
+    });
+    getLatestStatusByLocation([location.id]).then((res) => {
+      if (res.data) setModuleStatus(res.data[location.id] || {});
     });
   }, [location.code]);
 
@@ -275,6 +279,9 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
           const tintClass = g.accent === '#1D9A63' ? 'menu-card-green'
             : g.accent === '#B8760A' ? 'menu-card-yellow'
             : g.accent === '#D64545' ? 'menu-card-red' : '';
+          const checkedStatus = moduleStatus[g.moduleKey];
+          const checkedPillClass = checkedStatus === 'READY' ? 'pill-ok' : checkedStatus === 'NOT_READY' ? 'pill-danger' : 'pill-none';
+          const checkedPillLabel = checkedStatus === 'READY' ? '✓ ตรวจแล้ว' : checkedStatus === 'NOT_READY' ? '✓ ตรวจแล้ว (พบปัญหา)' : 'ยังไม่ตรวจ';
           return (
           <button
             key={g.moduleKey}
@@ -290,6 +297,9 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             {counts[g.moduleKey] !== undefined && (
               <div className="menu-card-subtitle">{counts[g.moduleKey]} รายการ</div>
             )}
+            <div className="menu-card-status">
+              <span className={`dash-pill ${checkedPillClass}`}>{checkedPillLabel}</span>
+            </div>
         </button>
           );
         })}
