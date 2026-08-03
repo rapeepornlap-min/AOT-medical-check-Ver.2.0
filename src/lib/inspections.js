@@ -12,6 +12,12 @@ export async function saveInspection({
   fuelLevel,
   note,
 }) {
+  // ป้องกันปัญหา session/token หมดอายุแบบเงียบๆ (มักเกิดหลังแอปถูก background ไว้นาน)
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session) {
+    return { error: 'เซสชันหมดอายุ กรุณาออกจากระบบแล้วเขาสู่ระบบใหม่ก่อนบันทึก' };
+  }
+
   const { data: location, error: locError } = await supabase
     .from('locations')
     .select('id')
@@ -19,10 +25,10 @@ export async function saveInspection({
     .single();
 
   if (locError || !location) {
-    return { error: `ไม่พบจุดตรวจสอบ (location code: ${locationCode}) กรุณาตรวจสอบข้อมูลใน locations ก่อน` };
+    return { error: ไม่พบจุดตรวจสอบ (location code: ${locationCode}) กรุณาตรวจสอบข้อมูลใน locations ก่อน };
   }
 
-  const { data: inspection, error: insError } = await supabase
+  const insertInspection = () => supabase
     .from('inspections')
     .insert({
       location_id: location.id,
@@ -37,8 +43,15 @@ export async function saveInspection({
     .select('id')
     .single();
 
+  let { data: inspection, error: insError } = await insertInspection();
+
+  if (insError && insError.message?.includes('row-level security')) {
+    await supabase.auth.refreshSession();
+    ({ data: inspection, error: insError } = await insertInspection());
+  }
+
   if (insError) {
-    return { error: 'บันทึกไม่สำเร็จ: ' + insError.message };
+    return { error: 'บันทึกไม่สำเร็จ: ' + insError.message + ' (ลองออกจากระบบแล้วเข้าใหม่หากยังพบปญหา)' };
   }
 
   const itemRows = items.map((it) => ({
@@ -53,7 +66,7 @@ export async function saveInspection({
 
   const { error: itemsError } = await supabase.from('inspection_items').insert(itemRows);
   if (itemsError) {
-    return { error: 'บันทึกรายการย่อยไม่สำเร็จ: ' + itemsError.message };
+    return { error: 'บันทึกรายการยอยไม่สำเร็จ: ' + itemsError.message };
   }
 
   return { success: true, inspectionId: inspection.id };
