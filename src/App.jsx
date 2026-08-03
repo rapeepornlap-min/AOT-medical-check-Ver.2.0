@@ -513,7 +513,8 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
             }
             const a = answers[it.id] || {};
             const rowAccent = it.is_high_alert ? '#D64545' : accentColor;
-            <div className={`checklist-row ${it.is_high_alert ? 'checklist-row-highalert' : ''}`} key={it.id} style={rowAccent ? { borderLeft: `5px solid ${rowAccent}`, background: ACCENT_BG[rowAccent] || undefined } : undefined}>
+            return (
+              <div className={`checklist-row ${it.is_high_alert ? 'checklist-row-highalert' : ''}`} key={it.id} style={rowAccent ? { borderLeft: `5px solid ${rowAccent}`, background: ACCENT_BG[rowAccent] || undefined } : undefined}>
               
                 <div className="checklist-content">
                   <div className="checklist-item-label">
