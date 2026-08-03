@@ -62,7 +62,6 @@ export const LOCATION_MODULE_GROUPS = {
     { moduleKey: 'field_emergency_bag_greenSmall', label: 'กระเป๋าฉุกเฉิน · กระเป๋าเล็กสีเขียว' },
     { moduleKey: 'field_emergency_bag_redSmall', label: 'กระเป๋าฉุกเฉิน · กระเป๋าเล็กสีแดง' },
     { moduleKey: 'field_emergency_bag_oxygen', label: 'กระเป๋าฉุกเฉิน · กระเป๋าออกซิเจน' },
-    { moduleKey: 'field_emergency_bag_defib', label: 'กระเป๋าฉุกเฉิน · เครื่อง Defibrillator' },
   ],
   field_concg: [
     { moduleKey: 'medicine_bag_oral', label: 'กระเป๋ายา · ยารับประทาน', accent: '#1D9A63' },
