@@ -561,11 +561,15 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                           {it.status_label_bad || 'ไม่พร้อมใช้'}
                         </button>
                       </div>
-                      <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
-                      <div className="med-row">
-                        <input type="text" className="text-input" style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }} placeholder={it.standard_qty ? `มาตรฐาน ${it.standard_qty}` : 'จำนวน'} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
-                        {it.unit && <span className="unit-label">{it.unit}</span>}
-                      </div>
+                      {it.standard_qty && !isNaN(Number(it.standard_qty)) && (
+                        <>
+                          <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
+                          <div className="med-row">
+                            <input type="text" className="text-input" style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }} placeholder={`มาตรฐาน ${it.standard_qty}`} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                            {it.unit && <span className="unit-label">{it.unit}</span>}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
 
