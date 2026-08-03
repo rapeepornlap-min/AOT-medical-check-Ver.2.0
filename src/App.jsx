@@ -552,14 +552,21 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                   )}
 
                   {!it.has_expiry && !it.numeric_input && (
-                    <div className="status-buttons">
-                      <button type="button" className={`status-btn status-ok ${a.status === 'OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'OK' })}>
-                        {it.status_label_ok || 'พร้อมใช้'}
-                      </button>
-                      <button type="button" className={`status-btn status-not-ok ${a.status === 'NOT_OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'NOT_OK' })}>
-                        {it.status_label_bad || 'ไม่พร้อมใช้'}
-                      </button>
-                    </div>
+                    <>
+                      <div className="status-buttons">
+                        <button type="button" className={`status-btn status-ok ${a.status === 'OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'OK' })}>
+                          {it.status_label_ok || 'พร้อมใช้'}
+                        </button>
+                        <button type="button" className={`status-btn status-not-ok ${a.status === 'NOT_OK' ? 'status-btn-active' : ''}`} onClick={() => setAnswer(it.id, { status: 'NOT_OK' })}>
+                          {it.status_label_bad || 'ไม่พร้อมใช้'}
+                        </button>
+                      </div>
+                      <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
+                      <div className="med-row">
+                        <input type="text" className="text-input" style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }} placeholder={it.standard_qty ? `มาตรฐาน ${it.standard_qty}` : 'จำนวน'} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                        {it.unit && <span className="unit-label">{it.unit}</span>}
+                      </div>
+                    </>
                   )}
 
                   <input type="text" className="text-input note-input" placeholder="หมายเหตุ (ถ้ามี)" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
