@@ -471,7 +471,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
           name: it.item_name,
           status: it.has_expiry ? medStatus(a.expiry) : (it.numeric_input ? 'OK' : a.status || null),
           expiryDate: a.expiry || null,
-          amount: (it.numeric_input || it.has_expiry) ? (a.amount || '') : null,
+          amount: a.amount || null,
           note: [a.note, a.photo ? `แนบรูปถ่ายแล้ว${it.unit ? '' : ''}` : ''].filter(Boolean).join(' · '),
         };
       }),
