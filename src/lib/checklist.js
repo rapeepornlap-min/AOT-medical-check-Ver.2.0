@@ -167,16 +167,20 @@ export async function getLocationsWithResponsible(role) {
 }
 
 /**
- * ผลตรวจล่าสุดของแต่ละ location (READY/NOT_READY/ยังไม่มีข้อมูล) — ใช้ทำสถานะบนการ์ด
+ * ผลตรวจล่าสุดของแต่ละ module_key ในแต่ละ location — คืนค่าเป็น { location_id: { module_key: status } }
+ * (ใช้เทียบกับจำนวน module ทั้งหมดที่ location นั้นต้องตรวจ เพื่อรู้ว่า "ตรวจครบ" หรือยัง)
  */
 export async function getLatestStatusByLocation(locationIds) {
   const { data, error } = await supabase
     .from('latest_inspection_per_location')
-    .select('location_id, overall_status')
+    .select('location_id, module_key, overall_status')
     .in('location_id', locationIds);
   if (error) return { error: error.message };
   const map = {};
-  data.forEach((row) => { map[row.location_id] = row.overall_status; });
+  data.forEach((row) => {
+    if (!map[row.location_id]) map[row.location_id] = {};
+    map[row.location_id][row.module_key] = row.overall_status;
+  });
   return { data: map };
 }
 /**
