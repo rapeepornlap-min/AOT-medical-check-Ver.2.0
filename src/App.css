@@ -145,7 +145,7 @@ body {
 }
 .checklist-index { font-weight: 700; color: var(--cyan); font-size: 14px; min-width: 20px; }
 .checklist-content { flex: 1; }
-.checklist-item-label { font-size: 14.5px; font-weight: 500; color: var(--text); margin-bottom: 10px; }
+.checklist-item-label { font-size: 19px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
 
 .status-buttons { display: flex; gap: 8px; }
 .status-btn {

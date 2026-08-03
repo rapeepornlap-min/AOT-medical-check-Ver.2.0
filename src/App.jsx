@@ -395,6 +395,7 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
 // รองรับ: is_header (หัวข้อคั่น), has_expiry (วันหมดอายุ), numeric_input (กรอกจำนวน),
 //         photo_attach (ปุ่มแนบรูป), reminder_note (ป้ายเตือน)
 // -------------------------------------------------------------------------
+const ACCENT_BG = { '#1D9A63': '#EAF7F0', '#B8760A': '#FDF3E3', '#D64545': '#FBEAEA' };
 function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone, accentColor }) {
   const isReadOnly = user.role === 'ADMIN';
   const [items, setItems] = useState([]);
@@ -512,8 +513,8 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
             }
             const a = answers[it.id] || {};
             const rowAccent = it.is_high_alert ? '#D64545' : accentColor;
-            return (
-              <div className={`checklist-row ${it.is_high_alert ? 'checklist-row-highalert' : ''}`} key={it.id} style={rowAccent ? { borderLeft: `5px solid ${rowAccent}` } : undefined}>
+            <div className={`checklist-row ${it.is_high_alert ? 'checklist-row-highalert' : ''}`} key={it.id} style={rowAccent ? { borderLeft: `5px solid ${rowAccent}`, background: ACCENT_BG[rowAccent] || undefined } : undefined}>
+              
                 <div className="checklist-content">
                   <div className="checklist-item-label">
                     {it.is_high_alert && <span className="high-alert-badge">⚠️ High Alert</span>}
