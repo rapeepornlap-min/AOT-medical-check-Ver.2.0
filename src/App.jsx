@@ -470,7 +470,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
           name: it.item_name,
           status: it.has_expiry ? medStatus(a.expiry) : (it.numeric_input ? 'OK' : a.status || null),
           expiryDate: a.expiry || null,
-          amount: it.numeric_input ? (a.amount || '') : null,
+          amount: (it.numeric_input || it.has_expiry) ? (a.amount || '') : null,
           note: [a.note, a.photo ? `แนบรูปถ่ายแล้ว${it.unit ? '' : ''}` : ''].filter(Boolean).join(' · '),
         };
       }),
@@ -528,7 +528,16 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                       <div className="med-row">
                         <input type="date" className="text-input" value={a.expiry || ''} onChange={(e) => setAnswer(it.id, { expiry: e.target.value })} />
                         <span className={`med-status-pill ${medStatusClass[medStatus(a.expiry)]}`}>{medStatusLabel[medStatus(a.expiry)]}</span>
+                      <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
+                      <div className="med-row">
+                        <input type="number" className="text-input" placeholder={it.standard_qty ? `มาตรฐาน ${it.standard_qty}` : 'จำนวน'} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                        {it.unit && <span className="unit-label">{it.unit}</span>}
                       </div>
+                      {it.standard_qty && !isNaN(Number(it.standard_qty)) && a.amount !== undefined && a.amount !== '' && Number(a.amount) !== Number(it.standard_qty) && (
+                        <div className="reminder-banner" style={{ marginTop: 6 }}>
+                          ⚠️ จำนวนไม่ตรงกับมาตรฐาน (มาตรฐาน {it.standard_qty}{it.unit ? ` ${it.unit}` : ''}, ตรวจนับได้ {a.amount}{it.unit ? ` ${it.unit}` : ''})
+                        </div>
+                      )}
                     </>
                   )}
 
