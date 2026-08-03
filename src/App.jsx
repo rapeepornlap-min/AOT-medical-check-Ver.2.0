@@ -528,6 +528,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                       <div className="med-row">
                         <input type="date" className="text-input" value={a.expiry || ''} onChange={(e) => setAnswer(it.id, { expiry: e.target.value })} />
                         <span className={`med-status-pill ${medStatusClass[medStatus(a.expiry)]}`}>{medStatusLabel[medStatus(a.expiry)]}</span>
+                      </div>
                       <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
                       <div className="med-row">
                         <input type="number" className="text-input" placeholder={it.standard_qty ? `มาตรฐาน ${it.standard_qty}` : 'จำนวน'} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
