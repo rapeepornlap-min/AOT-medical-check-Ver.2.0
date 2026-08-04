@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
+import { saveInspection } from './lib/inspections';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
+import { supabase } from './lib/supabaseClient';
+import { generateMonthlyReportPDF } from './lib/pdfReport';
+import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
+import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
+import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
+import './App.css';
+import logo from './assets/logo.png';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
@@ -409,6 +419,25 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const [submitError, setSubmitError] = useState('');
 
   const [prefilled, setPrefilled] = useState(false);
+  const [uploadingId, setUploadingId] = useState(null);
+
+  const handlePhotoSelect = async (it, file) => {
+    if (!file) return;
+    setUploadingId(it.id);
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${locationCode}/${moduleKey}/${it.id}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('inspection-photos')
+      .upload(path, file, { upsert: true });
+    if (uploadError) {
+      alert('แนบรูปไม่สำเร็จ: ' + uploadError.message);
+      setUploadingId(null);
+      return;
+    }
+    const { data: publicUrlData } = supabase.storage.from('inspection-photos').getPublicUrl(path);
+    setAnswer(it.id, { photoUrl: publicUrlData.publicUrl });
+    setUploadingId(null);
+  };
 
   useEffect(() => {
     (async () => {
@@ -429,6 +458,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
             expiry: prev.expiry_date || undefined,
             amount: prev.amount != null ? String(prev.amount) : undefined,
             note: prev.note || undefined,
+            photoUrl: prev.photo_url || undefined,
           };
         });
         setAnswers(initial);
@@ -475,8 +505,9 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
           status: it.has_expiry ? medStatus(a.expiry) : (it.numeric_input ? 'OK' : a.status || null),
           expiryDate: a.expiry || null,
           amount: a.amount || null,
-          note: [a.note, a.photo ? `แนบรูปถ่ายแล้ว${it.unit ? '' : ''}` : ''].filter(Boolean).join(' · '),
-        };
+          note: a.note || null,
+          photoUrl: a.photoUrl || null,
+        }; 
       }),
     });
     setSubmitting(false);
@@ -579,9 +610,22 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                   <input type="text" className="text-input note-input" placeholder="หมายเหตุ (ถ้ามี)" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
 
                   {it.photo_attach && (
-                    <button type="button" className={`photo-btn ${a.photo ? 'photo-btn-active' : ''}`} onClick={() => setAnswer(it.id, { photo: !a.photo })}>
-                      {a.photo ? '📷 แนบรูปถ่ายแล้ว' : '📷 แนบรูปถ่าย'}
-                    </button>
+                    <div className="photo-attach-block">
+                      {a.photoUrl && (
+                        <img src={a.photoUrl} alt="รูปที่แนบ" className="photo-preview" />
+                      )}
+                      <label className={`photo-btn ${a.photoUrl ? 'photo-btn-active' : ''}`}>
+                        {uploadingId === it.id ? '⏳ กำลังอัปโหลด...' : a.photoUrl ? '📷 เปลี่ยนรูป' : '📷 แนบรูปถ่าย'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handlePhotoSelect(it, e.target.files[0])}
+                          disabled={uploadingId === it.id}
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
               </div>

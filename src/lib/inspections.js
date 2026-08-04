@@ -62,6 +62,7 @@ export async function saveInspection({
     expiry_date: it.expiryDate || null,
     amount: it.amount || null,
     note: it.note || null,
+    photo_url: it.photoUrl || null,
   }));
 
   const { error: itemsError } = await supabase.from('inspection_items').insert(itemRows);

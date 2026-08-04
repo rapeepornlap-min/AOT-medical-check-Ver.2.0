@@ -50,7 +50,7 @@ export async function getLatestInspectionAnswers(locationCode, moduleKey) {
 
   const { data: items, error: itemsError } = await supabase
     .from('inspection_items')
-    .select('item_code, status, expiry_date, amount, note')
+    .select('item_code, status, expiry_date, amount, note, photo_url')
     .eq('inspection_id', lastInspection.id);
   if (itemsError || !items) return { data: {} };
 

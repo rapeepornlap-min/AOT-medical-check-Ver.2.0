@@ -333,3 +333,12 @@ body {
   margin-top: 8px; background: #FBEAEA; color: #791F1F; font-size: 12.5px;
   padding: 8px 10px; border-radius: 8px; line-height: 1.4;
 }
+.photo-attach-block { margin-top: 10px; }
+.photo-preview {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border: 1px solid #E0E0E0;
+}
