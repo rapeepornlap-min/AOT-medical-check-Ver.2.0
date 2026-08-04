@@ -976,6 +976,8 @@ const MODULE_LABELS_TH = {
   ambulance_equipment: 'รายการอุปกรณ์', ambulance_medication: 'เวชภัณฑ์',
 };
 
+const FUEL_LABELS_TH = { F: 'เต็ม (F)', '3/4': '3/4', '1/2': '1/2', '1/4': '1/4', E: 'ต่ำ (E)' };
+
 function PendingAcknowledgmentsScreen({ user, onBack }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1016,6 +1018,12 @@ function PendingAcknowledgmentsScreen({ user, onBack }) {
               </span>
             </div>
             <div className="ack-card-sub">ผู้ตรวจ: {it.inspector_name} · {formatThaiDateTime(new Date(it.submitted_at))}</div>
+            {it.module_key === 'ambulance_daily' && (
+              <div className="checklist-standard" style={{ marginTop: 6 }}>
+                เลขไมล์: {it.mileage || '-'} กม. · น้ำมัน: {FUEL_LABELS_TH[it.fuel_level] || it.fuel_level || '-'}
+                {it.note && <><br />หมายเหตุ: {it.note}</>}
+              </div>
+            )}
             {it.problem_summary && (
               <div className="ack-problem-box">⚠️ {it.problem_summary}</div>
             )}
