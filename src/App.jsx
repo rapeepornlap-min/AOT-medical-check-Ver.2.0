@@ -221,7 +221,10 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
     if (expected.length === 0) return undefined;
     if (expected.some((k) => checked[k] === 'NOT_READY')) return 'NOT_READY';
     const missing = expected.filter((k) => !(k in checked));
-    if (missing.length > 0) return Object.keys(checked).length > 0 ? 'PARTIAL' : undefined;
+    if (missing.length > 0) {
+      const anyExpectedChecked = expected.some((k) => k in checked);
+      return anyExpectedChecked ? 'PARTIAL' : undefined;
+    }
     return 'READY';
   };
 
