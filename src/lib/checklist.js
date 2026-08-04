@@ -184,6 +184,19 @@ export async function getLatestStatusByLocation(locationIds) {
   return { data: map };
 }
 /**
+ * เช็คว่ารถพยาบาลแต่ละคันบันทึก "ประจำวัน" (ambulance_daily) ของวันนี้แล้วหรือยัง (เขตเวลาไทย)
+ * คืนค่าเป็น object { location_id: true/false }
+ */
+export async function getAmbulanceDailyLoggedToday(locationIds) {
+  const { data, error } = await supabase.rpc('get_ambulance_daily_logged_today', {
+    p_location_ids: locationIds,
+  });
+  if (error) return { error: error.message };
+  const map = {};
+  data.forEach((row) => { map[row.location_id] = row.logged_today; });
+  return { data: map };
+}
+/**
  * รายการที่ผู้ใช้ปัจจุบันต้องรับทราบ (คันที่ตัวเองรับผิดชอบ ยังไม่รับทราบ)
  */
 export async function getPendingAcknowledgments() {

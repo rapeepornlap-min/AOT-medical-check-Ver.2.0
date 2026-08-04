@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
@@ -199,6 +199,7 @@ const STATUS_LABELS_TH = { READY: 'พร้อมใช้งาน', NOT_READY
 
 function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLocation, onBack }) {
   const [statusMap, setStatusMap] = useState({});
+  const [dailyLoggedMap, setDailyLoggedMap] = useState({});
 
   useEffect(() => {
     const ids = locations.map((l) => l.id);
@@ -206,7 +207,12 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
     getLatestStatusByLocation(ids).then((res) => {
       if (res.data) setStatusMap(res.data);
     });
-  }, [locations]);
+    if (isAmbulance) {
+      getAmbulanceDailyLoggedToday(ids).then((res) => {
+        if (res.data) setDailyLoggedMap(res.data);
+      });
+    }
+  }, [locations, isAmbulance]);
 
   const expectedKeysFor = (loc) => {
     if (isAmbulance) return AMBULANCE_MODULES.filter((m) => m.moduleKey).map((m) => m.moduleKey);
@@ -219,14 +225,18 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
   const statusFor = (loc) => {
     const expected = expectedKeysFor(loc);
     const checked = statusMap[loc.id] || {};
-    if (expected.length === 0) return undefined;
-    if (expected.some((k) => checked[k] === 'NOT_READY')) return 'NOT_READY';
-    const missing = expected.filter((k) => !(k in checked));
-    if (missing.length > 0) {
-      const anyExpectedChecked = expected.some((k) => k in checked);
-      return anyExpectedChecked ? 'PARTIAL' : undefined;
+    let base;
+    if (expected.length === 0) base = undefined;
+    else if (expected.some((k) => checked[k] === 'NOT_READY')) base = 'NOT_READY';
+    else {
+      const missing = expected.filter((k) => !(k in checked));
+      if (missing.length > 0) {
+        const anyExpectedChecked = expected.some((k) => k in checked);
+        base = anyExpectedChecked ? 'PARTIAL' : undefined;
+      } else base = 'READY';
     }
-    return 'READY';
+    if (isAmbulance && dailyLoggedMap[loc.id] === false) return 'NOT_READY';
+    return base;
   };
 
   return (
@@ -379,6 +389,9 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
             <button key={f.key} type="button" className={`fuel-btn ${fuel === f.key ? 'fuel-btn-active' : ''}`} onClick={() => setFuel(f.key)}>{f.label}</button>
           ))}
         </div>
+        {(fuel === '1/2' || fuel === '1/4') && (
+          <div className="reminder-banner" style={{ marginTop: 10 }}>⚠️ ปริมาณน้ำมันเหลือน้อย ควรเติมน้ำมันก่อนรอบตรวจถัดไป</div>
+        )}
 
         <label className="field-label" style={{ marginTop: 16 }}>หมายเหตุ / ปัญหาที่พบ</label>
         <textarea className="text-input textarea" placeholder="ระบุปัญหาหรือข้อสังเกต..." value={note} onChange={(e) => setNote(e.target.value)} />
