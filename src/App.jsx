@@ -178,7 +178,7 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
             <div className="menu-card-subtitle">สรุปความพร้อมใช้งานภาพรวมทุกจุด</div>
           </button>
         )}
-        {!loading && !loadError && user.role !== 'ADMIN' && (
+        {!loading && !loadError && user.role === 'EMR_EMT' && (
           <button className="menu-card" onClick={onOpenPendingAck}>
             <div className="menu-card-dot" />
             <div className="menu-card-label">🔔 รอรับทราบ</div>
