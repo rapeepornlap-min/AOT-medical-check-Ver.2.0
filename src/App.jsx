@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
@@ -351,6 +351,18 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [alreadyLoggedToday, setAlreadyLoggedToday] = useState(false);
+
+  useEffect(() => {
+    getTodayDailyLog(vehicle.code).then((res) => {
+      if (res.data) {
+        setMileage(res.data.mileage || '');
+        setFuel(res.data.fuel_level || 'F');
+        setNote(res.data.note || '');
+        setAlreadyLoggedToday(true);
+      }
+    });
+  }, [vehicle.code]);
 
   const fuelLevels = [
     { key: 'F', label: 'เต็ม (F)' }, { key: '3/4', label: '3/4' }, { key: '1/2', label: '1/2' },
@@ -380,6 +392,11 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
     <div className="screen">
       <TopBar title="บันทึกประจำวัน" sub={`${vehicle.label} · ${formatThaiDateTime(new Date())}`} onBack={onBack} />
       <main className="form-body">
+        {alreadyLoggedToday && (
+          <div className="reminder-banner" style={{ marginBottom: 12 }}>
+            ✅ วันนี้บันทึกไปแล้ว — ข้อมูลด้านล่างคือค่าที่บันทึกล่าสุด แก้ไขแล้วกดบันทึกซ้ำได้ถ้าต้องการอัปเดต
+          </div>
+        )}
         <label className="field-label">เลขไมล์ (กม.) *</label>
         <input className="text-input" placeholder="เช่น 123456" value={mileage} onChange={(e) => setMileage(e.target.value)} />
 

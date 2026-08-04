@@ -197,6 +197,34 @@ export async function getAmbulanceDailyLoggedToday(locationIds) {
   return { data: map };
 }
 /**
+ * ดึงข้อมูล "ประจำวัน" (ambulance_daily) ที่บันทึกไว้ล่าสุดของวันนี้ (เขตเวลาไทย) ถ้ามี
+ * คืนค่าเป็น { mileage, fuel_level, note } หรือ null ถ้ายังไม่มีการบันทึกวันนี้
+ */
+export async function getTodayDailyLog(locationCode) {
+  const { data: location, error: locError } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('code', locationCode)
+    .single();
+  if (locError || !location) return { data: null };
+
+  const { data, error } = await supabase
+    .from('inspections')
+    .select('mileage, fuel_level, note, submitted_at')
+    .eq('location_id', location.id)
+    .eq('module_key', 'ambulance_daily')
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return { data: null };
+
+  const bkkDate = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  if (bkkDate(data.submitted_at) !== today) return { data: null };
+
+  return { data };
+}
+/**
  * รายการที่ผู้ใช้ปัจจุบันต้องรับทราบ (คันที่ตัวเองรับผิดชอบ ยังไม่รับทราบ)
  */
 export async function getPendingAcknowledgments() {
