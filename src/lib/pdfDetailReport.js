@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { sarabunRegularBase64 } from '../assets/fonts/sarabunRegularBase64';
 import { sarabunBoldBase64 } from '../assets/fonts/sarabunBoldBase64';
 import { getFullDetailByPeriod } from './checklist';
+import { sharePDF } from './pdfShare';
 
 const NAVY = '#1B3A6B';
 const OK = '#1D9A63';
@@ -90,6 +91,5 @@ export async function generateDetailedMonthlyReportPDF() {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')} · หน้า ${i}/${pageCount}`, 14, 289);
   }
 
-  const blobUrl = doc.output('bloburl');
-  window.open(blobUrl, '_blank');
-}
+  await sharePDF(doc, `รายงานละเอียด_${monthLabel(now).replace(' ', '_')}.pdf`);
+}  
