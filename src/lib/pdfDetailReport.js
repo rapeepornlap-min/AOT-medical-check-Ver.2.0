@@ -90,5 +90,6 @@ export async function generateDetailedMonthlyReportPDF() {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')} · หน้า ${i}/${pageCount}`, 14, 289);
   }
 
-  doc.save(`รายงานละเอียด_${monthLabel(now).replace(' ', '_')}.pdf`);
+  const blobUrl = doc.output('bloburl');
+  window.open(blobUrl, '_blank');
 }

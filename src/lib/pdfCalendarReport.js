@@ -136,5 +136,6 @@ export async function generateComplianceCalendarPDF() {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 14, 202);
   }
 
-  doc.save(`ปฏิทินการตรวจ_${monthLabel(now).replace(' ', '_')}.pdf`);
+  const blobUrl = doc.output('bloburl');
+  window.open(blobUrl, '_blank');
 }

@@ -172,5 +172,6 @@ export async function generateMonthlyReportPDF() {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 18, 289);
   }
 
-  doc.save(`รายงานความพร้อมใช้งาน_${monthLabel(now).replace(' ', '_')}.pdf`);
+  const blobUrl = doc.output('bloburl');
+  window.open(blobUrl, '_blank');
 }
