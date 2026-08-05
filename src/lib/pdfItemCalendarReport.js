@@ -100,7 +100,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFont('Sarabun', 'normal');
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
-    doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
+    doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')} · DEBUG items=${items.length} statusEntries=${Object.keys(statusMap).length}`, 8, 205);
   }
 
   await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
