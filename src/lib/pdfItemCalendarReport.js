@@ -62,8 +62,8 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     ...Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1;
       const status = statusMap[`${it.item_id}-${day}`];
-      if (status === 'OK') return '✓';
-      if (status === 'NOT_OK' || status === 'EXPIRED') return '✗';
+      if (status === 'OK') return 'OK';
+      if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
       return '';
     }),
   ]);
@@ -84,8 +84,8 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       const colIdx = data.column.index;
       const day = colIdx - 2;
       if (data.section === 'body' && colIdx >= 3) {
-        if (data.cell.raw === '✓') data.cell.styles.textColor = OK;
-        else if (data.cell.raw === '✗') data.cell.styles.textColor = BAD;
+        if (data.cell.raw === 'OK') data.cell.styles.textColor = OK;
+        else if (data.cell.raw === 'X') data.cell.styles.textColor = BAD;
         if (weekendDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
       }
       if (data.section === 'head' && colIdx >= 3 && weekendDays.has(day)) {
@@ -100,7 +100,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFont('Sarabun', 'normal');
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
-    doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')} · DEBUG items=${items.length} statusEntries=${Object.keys(statusMap).length}`, 8, 205);
+    doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
   }
 
   await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
