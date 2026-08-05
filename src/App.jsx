@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
 import { generateItemCalendarPDF } from './lib/pdfItemCalendarReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
@@ -785,19 +786,232 @@ function CategoryGrid({ summary }) {
   );
 }
 
-function NotReadyList({ items }) {
+function NotReadyList({ items, onSelect }) {
   if (items.length === 0) return <div className="empty-state">ไม่มีจุดที่ต้องแก้ไขในช่วงเวลานี้</div>;
   return (
     <div className="dash-notready-list">
       {items.map((it, idx) => (
-        <div className="dash-notready-row" key={idx}>
+        <button type="button" className="dash-notready-row" key={idx} onClick={() => onSelect(it)}>
           <div>
             <div className="dash-notready-name">{it.location_label} · {it.module_key}</div>
-            <div className="dash-notready-sub">{it.problem_count} รายการไม่พร้อมใช้</div>
+            <div className="dash-notready-sub">{it.problem_count} รายการไม่พร้อมใช้ · แตะเพื่อดูรายละเอียด</div>
           </div>
           <span className="dash-pill pill-danger">ไม่พร้อมใช้</span>
-        </div>
+        </button>
       ))}
+    </div>
+  );
+}
+
+function NotReadyDetailScreen({ item, onBack }) {
+  const [problems, setProblems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getInspectionProblemItems(item.inspection_id).then((res) => {
+      setProblems(res.data || []);
+      setLoading(false);
+    });
+  }, [item.inspection_id]);
+
+  return (
+    <div className="screen dashboard-dark">
+      <TopBar title={item.location_label} sub={item.module_key} onBack={onBack} />
+      <main className="form-body">
+        <div className="dash-notready-sub" style={{ marginBottom: 12 }}>
+          ตรวจล่าสุด: {formatThaiDateTime(new Date(item.submitted_at))}
+        </div>
+        {loading && <div className="empty-state">กำลังโหลด...</div>}
+        {!loading && problems.length === 0 && <div className="empty-state">ไม่พบรายละเอียดรายการที่ไม่พร้อมใช้</div>}
+        {!loading && problems.map((p, idx) => (
+          <div className="dash-notready-row" key={idx} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div className="dash-notready-name">{p.item_name}</div>
+            {p.expiry_date && <div className="dash-notready-sub">วันหมดอายุ: {p.expiry_date}</div>}
+            {p.amount && <div className="dash-notready-sub">จำนวนที่ตรวจนับได้: {p.amount}</div>}
+            {p.note && <div className="dash-notready-sub">หมายเหตุ: {p.note}</div>}
+          </div>
+        ))}
+      </main>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="skel skel-card" />
+      <div className="skel skel-title" />
+      <div className="skel skel-row" />
+      <div className="skel skel-row" />
+      <div className="skel skel-title" />
+      <div className="skel-grid">
+        <div className="skel skel-tile" />
+        <div className="skel skel-tile" />
+        <div className="skel skel-tile" />
+        <div className="skel skel-tile" />
+      </div>
+      <div className="skel skel-title" />
+      <div className="skel skel-row" />
+      <div className="skel skel-row" />
+      <div className="skel skel-row" />
+    </>
+  );
+}
+
+function RadialGauge({ pct, color, label }) {
+  const r = 30;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (circumference * (pct || 0)) / 100;
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#1B2540" strokeWidth="7" />
+        <circle
+          cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="7"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeLinecap="round" transform="rotate(-90 36 36)"
+        />
+        <text x="36" y="41" fill="#E7ECFB" fontSize="15" fontWeight="700" textAnchor="middle">{pct}%</text>
+      </svg>
+      <div style={{ color: '#8B96B3', fontSize: 11, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
+function ProgressBarRow({ label, pct }) {
+  const color = pct >= 90 ? 'linear-gradient(90deg,#22D3EE,#34D399)'
+    : pct >= 60 ? 'linear-gradient(90deg,#FBBF24,#FB923C)'
+    : 'linear-gradient(90deg,#FB7185,#F43F5E)';
+  const pctColor = pct >= 90 ? '#22D3EE' : pct >= 60 ? '#FBBF24' : '#FB7185';
+  return (
+    <div className="bar-row">
+      <div className="bar-row-top">
+        <span className="bar-row-label">{label}</span>
+        <span className="bar-row-pct" style={{ color: pctColor }}>{pct}%</span>
+      </div>
+      <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
+    </div>
+  );
+}
+
+function CategoryInsightScreen({ onBack }) {
+  const [category, setCategory] = useState('AMBULANCE');
+  const [period, setPeriod] = useState('month');
+  const [locSummary, setLocSummary] = useState([]);
+  const [trend, setTrend] = useState([]);
+  const [topProblems, setTopProblems] = useState([]);
+  const [moduleBreakdown, setModuleBreakdown] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const start = periodStartDate(period);
+      const [locRes, trendRes, probRes, modRes] = await Promise.all([
+        getCategoryLocationSummary(category, start),
+        getCategoryReadinessTrend(category, 14),
+        getCategoryTopProblems(category, start, 8),
+        getCategoryModuleBreakdown(category),
+      ]);
+      setLocSummary(locRes.data || []);
+      setTrend(trendRes.data || []);
+      setTopProblems(probRes.data || []);
+      setModuleBreakdown(modRes.data || []);
+      setLoading(false);
+    })();
+  }, [category, period]);
+
+  const groupedModules = {};
+  moduleBreakdown.forEach((m) => {
+    if (!groupedModules[m.location_label]) groupedModules[m.location_label] = [];
+    groupedModules[m.location_label].push(m);
+  });
+
+  const validTrend = trend.filter((t) => t.ready_pct !== null && t.ready_pct !== undefined);
+  const last7 = validTrend.slice(-7);
+  const weekAvg = last7.length > 0 ? Math.round(last7.reduce((s, t) => s + Number(t.ready_pct), 0) / last7.length) : 0;
+  const monthAvg = validTrend.length > 0 ? Math.round(validTrend.reduce((s, t) => s + Number(t.ready_pct), 0) / validTrend.length) : 0;
+
+  return (
+    <div className="screen dashboard-dark">
+      <TopBar title="เปรียบเทียบตามหมวด" sub={CATEGORY_LABELS[category]} onBack={onBack} />
+      <main className="form-body dashboard-wide">
+        <div className="filter-bar">
+          <div className="filter-group">
+            <span className="filter-label">หมวด</span>
+            <select className="filter-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+              {Object.keys(CATEGORY_LABELS).map((c) => (
+                <option key={c} value={c}>{CATEGORY_ICONS[c]} {CATEGORY_LABELS[c]}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <span className="filter-label">ช่วงเวลา</span>
+            <select className="filter-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
+              {PERIOD_OPTIONS.map((p) => (
+                <option key={p.key} value={p.key}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {loading && <DashboardSkeleton />}
+        {!loading && (
+          <>
+            <h3 className="dash-section-title">เทรนด์ความพร้อมใช้งาน 14 วันล่าสุด</h3>
+            <div className="dash-overall-card" style={{ height: 200 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#26324A" />
+                  <XAxis dataKey="day" tickFormatter={(d) => d ? d.slice(5) : ''} stroke="#8B96B3" fontSize={11} />
+                  <YAxis domain={[0, 100]} stroke="#8B96B3" fontSize={11} />
+                  <Tooltip contentStyle={{ background: '#141B2E', border: '1px solid #26324A', color: '#E7ECFB' }} />
+                  <Line type="monotone" dataKey="ready_pct" stroke="#22D3EE" strokeWidth={3} dot={{ r: 3 }} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 14 }}>
+              <RadialGauge pct={weekAvg} color="#22D3EE" label="เฉลี่ย 7 วันล่าสุด" />
+              <RadialGauge pct={monthAvg} color="#A78BFA" label="เฉลี่ย 14 วันล่าสุด" />
+            </div>
+
+            <h3 className="dash-section-title">เปรียบเทียบความพร้อมใช้งานแต่ละจุด</h3>
+            {locSummary.map((row) => {
+              const pct = row.total_count > 0 ? Math.round((row.ready_count / row.total_count) * 100) : 0;
+              return <ProgressBarRow key={row.location_id} label={row.location_label} pct={pct} />;
+            })}
+            {locSummary.length === 0 && <div className="empty-state">ไม่มีข้อมูลในช่วงเวลานี้</div>}
+
+            <h3 className="dash-section-title">อันดับรายการที่มีปัญหาบ่อยสุด</h3>
+            {topProblems.map((p, idx) => (
+              <div className="dash-notready-row" key={idx}>
+                <div>
+                  <div className="dash-notready-name">#{idx + 1} {p.item_name}</div>
+                </div>
+                <span className="dash-pill pill-danger">{p.problem_count} ครั้ง</span>
+              </div>
+            ))}
+            {topProblems.length === 0 && <div className="empty-state">ไม่พบรายการที่มีปัญหาในช่วงเวลานี้</div>}
+
+            <h3 className="dash-section-title">สัดส่วนความพร้อมแยกตามโมดูลย่อย</h3>
+            {Object.entries(groupedModules).map(([locLabel, mods]) => (
+              <div key={locLabel} style={{ marginBottom: 14 }}>
+                <div className="dash-notready-name" style={{ marginBottom: 6 }}>{locLabel}</div>
+                {mods.map((m) => (
+                  <div className="dash-compliance-row" key={m.module_key}>
+                    <span>{m.module_key}</span>
+                    <span className={`dash-pill ${m.overall_status === 'READY' ? 'pill-ok' : m.overall_status === 'NOT_READY' ? 'pill-danger' : 'pill-none'}`}>
+                      {m.overall_status === 'READY' ? 'พร้อมใช้' : m.overall_status === 'NOT_READY' ? 'ไม่พร้อมใช้' : m.overall_status || 'ยังไม่ตรวจ'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {Object.keys(groupedModules).length === 0 && <div className="empty-state">ไม่มีข้อมูล</div>}
+          </>
+        )}
+      </main>
     </div>
   );
 }
@@ -828,6 +1042,8 @@ function DashboardScreen({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [ackSummary, setAckSummary] = useState([]);
+  const [selectedNotReady, setSelectedNotReady] = useState(null);
+  const [showCategoryInsight, setShowCategoryInsight] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -855,8 +1071,15 @@ function DashboardScreen({ onBack }) {
 
   const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || '';
 
+  if (selectedNotReady) {
+    return <NotReadyDetailScreen item={selectedNotReady} onBack={() => setSelectedNotReady(null)} />;
+  }
+  if (showCategoryInsight) {
+    return <CategoryInsightScreen onBack={() => setShowCategoryInsight(false)} />;
+  }
+
   return (
-    <div className="screen">
+    <div className="screen dashboard-dark">
       <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
       <main className="form-body dashboard-wide">
         <div className="dash-period-tabs" style={{ justifyContent: 'space-between' }}>
@@ -871,10 +1094,11 @@ function DashboardScreen({ onBack }) {
             <button className="dash-pdf-btn" onClick={() => generateMonthlyReportPDF()}>📄 รายงานสรุป</button>
             <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateDetailedMonthlyReportPDF()}>📋 รายงานละเอียด</button>
             <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => setShowCategoryInsight(true)}>📊 เปรียบเทียบตามหมวด</button>
           </div>
         </div>
 
-        {loading && <div className="empty-state">กำลังโหลดข้อมูล...</div>}
+        {loading && <DashboardSkeleton />}
         {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
         {!loading && !loadError && (
           <>
@@ -884,7 +1108,7 @@ function DashboardScreen({ onBack }) {
             <h3 className="dash-section-title">แยกตามหมวด</h3>
             <CategoryGrid summary={summary} />
             <h3 className="dash-section-title">รายจุดที่ยังไม่พร้อมใช้ ({periodLabel})</h3>
-            <NotReadyList items={notReady} />
+            <NotReadyList items={notReady} onSelect={setSelectedNotReady} />
             <h3 className="dash-section-title">การรับทราบของผู้รับผิดชอบรถ ({periodLabel})</h3>
             <div className="dash-notready-list">
               {ackSummary.length === 0 && <div className="empty-state">ยังไม่มีข้อมูลในช่วงเวลานี้</div>}

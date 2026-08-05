@@ -286,3 +286,52 @@ export async function getItemCalendarData(locationCode, moduleKey, year, month) 
 
   return { data: { locationLabel: location.label, items, statusMap } };
 }
+/**
+ * ดึงรายการที่ "ไม่พร้อมใช้" (NOT_OK) ของการตรวจครั้งหนึ่งๆ สำหรับหน้ารายละเอียดใน Dashboard
+ */
+export async function getInspectionProblemItems(inspectionId) {
+  const { data, error } = await supabase.rpc('get_inspection_problem_items', {
+    p_inspection_id: inspectionId,
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+/**
+ * ===== หน้า "เปรียบเทียบตามหมวด" =====
+ */
+export async function getCategoryLocationSummary(category, periodStart) {
+  const { data, error } = await supabase.rpc('get_category_location_summary', {
+    p_category: category,
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+export async function getCategoryReadinessTrend(category, days = 14) {
+  const { data, error } = await supabase.rpc('get_category_readiness_trend', {
+    p_category: category,
+    p_days: days,
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+export async function getCategoryTopProblems(category, periodStart, limit = 8) {
+  const { data, error } = await supabase.rpc('get_category_top_problems', {
+    p_category: category,
+    p_start: periodStart || '1970-01-01T00:00:00Z',
+    p_limit: limit,
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
+export async function getCategoryModuleBreakdown(category) {
+  const { data, error } = await supabase.rpc('get_category_module_breakdown', {
+    p_category: category,
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
