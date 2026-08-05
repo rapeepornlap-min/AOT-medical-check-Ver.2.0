@@ -3,6 +3,7 @@ import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
+import { generateItemCalendarPDF } from './lib/pdfItemCalendarReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
@@ -314,6 +315,13 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             <div className="menu-card-status">
               <span className={`dash-pill ${checkedPillClass}`}>{checkedPillLabel}</span>
             </div>
+            <button
+              type="button"
+              className="menu-card-report-btn"
+              onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(location.code, g.moduleKey, g.label); }}
+            >
+              📊 รายงานตารางรายเดือน
+            </button>
         </button>
           );
         })}

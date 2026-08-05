@@ -342,3 +342,14 @@ body {
   margin-bottom: 8px;
   border: 1px solid #E0E0E0;
 }
+.menu-card-report-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #C7CEDA;
+  background: #ffffff;
+  color: #1B3A6B;
+  font-size: 12px;
+  font-family: inherit;
+}
