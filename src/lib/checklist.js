@@ -255,6 +255,24 @@ export async function getAcknowledgmentSummary(periodStart) {
   return { data };
 }
 /**
+ * วันหยุดนักขัตฤกษ์ในเดือนที่ระบุ (สำหรับเว้นวันหยุดในรายงานตารางรายเดือน)
+ * คืนค่าเป็น array ของ "วันที่" (1-31)
+ */
+export async function getPublicHolidays(year, month) {
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  const { data, error } = await supabase
+    .from('public_holidays')
+    .select('holiday_date')
+    .gte('holiday_date', start)
+    .lte('holiday_date', end);
+  if (error) return { error: error.message };
+  const days = data.map((row) => Number(row.holiday_date.slice(8, 10)));
+  return { data: days };
+}
+
+/**
  * ดึงข้อมูลตารางเช็คลิสต์รายเดือน (รายการ x วันที่) ของจุด+โมดูลหนึ่งๆ
  * คืนค่าเป็น { locationLabel, items: [{item_id, item_name, standard_qty}], statusMap: {"itemId-day": "OK"/"NOT_OK"/...} }
  */

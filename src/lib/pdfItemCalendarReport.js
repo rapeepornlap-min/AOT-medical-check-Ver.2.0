@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { sarabunRegularBase64 } from '../assets/fonts/sarabunRegularBase64';
 import { sarabunBoldBase64 } from '../assets/fonts/sarabunBoldBase64';
-import { getItemCalendarData } from './checklist';
+import { getItemCalendarData, getPublicHolidays } from './checklist';
 import { sharePDF } from './pdfShare';
 import { drawCheckIcon } from './pdfCheckmark';
 
@@ -29,12 +29,16 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const res = await getItemCalendarData(locationCode, moduleKey, year, month);
+  const [res, holidayRes] = await Promise.all([
+    getItemCalendarData(locationCode, moduleKey, year, month),
+    getPublicHolidays(year, month),
+  ]);
   if (res.error) {
     alert('ดึงข้อมูลไม่สำเร็จ: ' + res.error);
     return;
   }
   const { locationLabel, items, statusMap } = res.data;
+  const holidayDays = new Set(holidayRes.data || []);
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const weekendDays = new Set();
@@ -42,6 +46,8 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     const dow = new Date(year, month - 1, d).getDay();
     if (dow === 0 || dow === 6) weekendDays.add(d);
   }
+  // วันหยุด = เสาร์-อาทิตย์ หรือวันหยุดนักขัตฤกษ์ — เว้นจากการเติมเครื่องหมายถูกอัตโนมัติของทั้งสัปดาห์
+  const nonWorkDays = new Set([...weekendDays, ...holidayDays]);
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   registerThaiFont(doc);
@@ -67,10 +73,11 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
   }
 
   const body = items.map((it, idx) => {
-    // ถ้าสัปดาห์ไหนมีการติ๊ก OK อย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้นตรวจครบ (OK ทุกวันในสัปดาห์นั้น)
+    // ถ้าสัปดาห์ไหนมีการติ๊ก OK ในวันทำงานอย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้น (เฉพาะวันทำงาน) ตรวจครบ
+    // เว้นเสาร์-อาทิตย์และวันหยุดนักขัตฤกษ์ไว้เสมอ ไม่เติมเครื่องหมายถูกอัตโนมัติให้
     const okWeeks = new Set();
     for (let d = 1; d <= daysInMonth; d++) {
-      if (statusMap[`${it.item_id}-${d}`] === 'OK') okWeeks.add(dayToWeek[d]);
+      if (!nonWorkDays.has(d) && statusMap[`${it.item_id}-${d}`] === 'OK') okWeeks.add(dayToWeek[d]);
     }
     return [
       String(idx + 1),
@@ -79,6 +86,11 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       ...Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;
         const status = statusMap[`${it.item_id}-${day}`];
+        if (nonWorkDays.has(day)) {
+          if (status === 'OK') return 'OK';
+          if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
+          return '-';
+        }
         if (status === 'OK' || okWeeks.has(dayToWeek[day])) return 'OK';
         if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
         return '';
@@ -104,9 +116,10 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       if (data.section === 'body' && colIdx >= 3) {
         if (data.cell.raw === 'OK') data.cell.text = [];
         else if (data.cell.raw === 'X') data.cell.styles.textColor = BAD;
-        if (weekendDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
+        else if (data.cell.raw === '-') data.cell.styles.textColor = '#9AA5B5';
+        if (nonWorkDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
       }
-      if (data.section === 'head' && colIdx >= 3 && weekendDays.has(day)) {
+      if (data.section === 'head' && colIdx >= 3 && nonWorkDays.has(day)) {
         data.cell.styles.fillColor = WEEKEND_HEAD_BG;
       }
     },
@@ -124,6 +137,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFont('Sarabun', 'normal');
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
+    doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
   }
 
