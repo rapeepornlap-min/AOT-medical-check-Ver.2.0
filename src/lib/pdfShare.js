@@ -1,11 +1,16 @@
 /**
- * แชร์/ดาวน์โหลด PDF บนมือถือ — ใช้ Web Share API ถ้ารองรับ (เปิดเมนูแชร์/บันทึกไฟล์ของเครื่อง)
- * ถ้าเบราว์เซอร์ไม่รองรับ จะ fallback ไปเปิดดูในแท็บใหม่แทน
+ * แชร์/ดาวน์โหลด PDF — บนมือถือใช้ Web Share API (เปิดเมนูแชร์/บันทึกไฟล์ของเครื่อง)
+ * บน PC เปิดดูในแท็บใหม่โดยตรงเสมอ ไม่เด้งกล่องแชร์ของ Windows
  */
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+
 export async function sharePDF(doc, filename) {
   const blob = doc.output('blob');
 
-  if (navigator.canShare) {
+  if (isMobileDevice() && navigator.canShare) {
     const file = new File([blob], filename, { type: 'application/pdf' });
     if (navigator.canShare({ files: [file] })) {
       try {
