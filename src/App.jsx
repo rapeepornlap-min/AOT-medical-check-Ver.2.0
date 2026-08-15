@@ -319,7 +319,7 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             <button
               type="button"
               className="menu-card-report-btn"
-              onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(location.code, g.moduleKey, g.label); }}
+              onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateItemCalendarPDF(location.code, g.moduleKey, g.label, win); }}
             >
               📊 รายงานตารางรายเดือน
             </button>
@@ -1212,8 +1212,8 @@ function DashboardScreen({ user, onBack }) {
   const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const handleNav = (key) => {
-    if (key === 'reportSummary') generateMonthlyReportPDF();
-    else if (key === 'reportDetail') generateDetailedMonthlyReportPDF();
+    if (key === 'reportSummary') { const win = window.open('', '_blank'); generateMonthlyReportPDF(win); }
+    else if (key === 'reportDetail') { const win = window.open('', '_blank'); generateDetailedMonthlyReportPDF(win); }
     else if (key === 'insight') setShowCategoryInsight(true);
     else if (key === 'operations') onBack();
     else if (key === 'notready') scrollTo(notReadyRef);
@@ -1315,7 +1315,7 @@ function DashboardScreen({ user, onBack }) {
               <ExpiringAlertsList items={expiring} />
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => { const win = window.open('', '_blank'); generateComplianceCalendarPDF(win); }}>🗓️ ปฏิทินการตรวจ</button>
               </div>
             </>
           )}

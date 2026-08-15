@@ -29,7 +29,7 @@ function buildGrid(rows, columnKey) {
   return { vehicles, columns, map };
 }
 
-export async function generateComplianceCalendarPDF() {
+export async function generateComplianceCalendarPDF(preOpenedWindow) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -71,7 +71,7 @@ export async function generateComplianceCalendarPDF() {
       `${v} (${doneCount}/${workdayCols.length})`,
       ...daily.columns.map((c) => {
         if (!workdaySet.has(c)) return '-';
-        return daily.map[`${v}-${c}`] ? '✓' : '·';
+        return daily.map[`${v}-${c}`] ? 'OK' : '·';
       }),
     ];
   });
@@ -85,7 +85,7 @@ export async function generateComplianceCalendarPDF() {
     margin: { left: 14, right: 14 },
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index > 0) {
-        if (data.cell.raw === '✓') data.cell.styles.textColor = OK;
+        if (data.cell.raw === 'OK') data.cell.styles.textColor = OK;
         else if (data.cell.raw === '-') data.cell.styles.textColor = '#C4CBD6';
         else data.cell.styles.textColor = BAD;
       }
@@ -110,7 +110,7 @@ export async function generateComplianceCalendarPDF() {
     const doneCount = weekly.columns.filter((c) => weekly.map[`${v}-${c}`]).length;
     return [
       `${v} (${doneCount}/${weekly.columns.length})`,
-      ...weekly.columns.map((c) => (weekly.map[`${v}-${c}`] ? '✓' : '·')),
+      ...weekly.columns.map((c) => (weekly.map[`${v}-${c}`] ? 'OK' : '·')),
     ];
   });
   autoTable(doc, {
@@ -123,7 +123,7 @@ export async function generateComplianceCalendarPDF() {
     margin: { left: 14, right: 14 },
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index > 0) {
-        data.cell.styles.textColor = data.cell.raw === '✓' ? OK : BAD;
+        data.cell.styles.textColor = data.cell.raw === 'OK' ? OK : BAD;
       }
     },
   });
@@ -137,5 +137,5 @@ export async function generateComplianceCalendarPDF() {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 14, 202);
   }
 
-  await sharePDF(doc, `ปฏิทินการตรวจ_${monthLabel(now).replace(' ', '_')}.pdf`);
+  await sharePDF(doc, `ปฏิทินการตรวจ_${monthLabel(now).replace(' ', '_')}.pdf`, preOpenedWindow);
 }
