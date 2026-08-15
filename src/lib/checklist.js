@@ -273,6 +273,28 @@ export async function getPublicHolidays(year, month) {
 }
 
 /**
+ * ดึงข้อมูล "บันทึกประจำวัน" (ambulance_daily) ทั้งเดือนของคันรถหนึ่งๆ สำหรับรายงานตารางรายเดือน
+ * คืนค่าเป็น { locationLabel, entries: [{day, inspector_name, mileage, fuel_level, note, overall_status}] }
+ */
+export async function getAmbulanceDailyLogCalendar(locationCode, year, month) {
+  const { data: location, error: locError } = await supabase
+    .from('locations')
+    .select('label')
+    .eq('code', locationCode)
+    .single();
+  if (locError || !location) return { error: locError?.message || 'ไม่พบสถานที่' };
+
+  const { data, error } = await supabase.rpc('get_ambulance_daily_log_calendar', {
+    p_location_code: locationCode,
+    p_year: year,
+    p_month: month,
+  });
+  if (error) return { error: error.message };
+
+  return { data: { locationLabel: location.label, entries: data || [] } };
+}
+
+/**
  * ดึงข้อมูลตารางเช็คลิสต์รายเดือน (รายการ x วันที่) ของจุด+โมดูลหนึ่งๆ
  * คืนค่าเป็น { locationLabel, items: [{item_id, item_name, standard_qty}], statusMap: {"itemId-day": "OK"/"NOT_OK"/...} }
  */

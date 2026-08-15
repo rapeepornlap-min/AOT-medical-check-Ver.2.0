@@ -5,6 +5,7 @@ import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getOverallReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
 import { generateItemCalendarPDF } from './lib/pdfItemCalendarReport';
+import { generateDailyLogReportPDF } from './lib/pdfDailyLogReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
@@ -350,6 +351,15 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
                 type="button"
                 className="menu-card-report-btn"
                 onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label, win); }}
+              >
+                📊 รายงานตารางรายเดือน
+              </button>
+            )}
+            {m.id === 'daily' && (
+              <button
+                type="button"
+                className="menu-card-report-btn"
+                onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateDailyLogReportPDF(vehicle.code, win); }}
               >
                 📊 รายงานตารางรายเดือน
               </button>
