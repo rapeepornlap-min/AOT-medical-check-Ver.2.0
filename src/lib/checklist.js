@@ -318,6 +318,14 @@ export async function getCategoryReadinessTrend(category, days = 14) {
   return { data };
 }
 
+export async function getOverallReadinessTrend(days = 14) {
+  const { data, error } = await supabase.rpc('get_overall_readiness_trend', {
+    p_days: days,
+  });
+  if (error) return { error: error.message };
+  return { data };
+}
+
 export async function getCategoryTopProblems(category, periodStart, limit = 8) {
   const { data, error } = await supabase.rpc('get_category_top_problems', {
     p_category: category,

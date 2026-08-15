@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
-import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
+import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getOverallReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
 import { generateItemCalendarPDF } from './lib/pdfItemCalendarReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
@@ -716,7 +716,7 @@ const CATEGORY_LABELS = { AMBULANCE: 'รถพยาบาล', FIELD_BAG: 'ก
 
 function MiniDonut({ pct }) {
   return (
-    <div className="mini-donut" style={{ background: `conic-gradient(#4FD1A5 0% ${pct}%, rgba(255,255,255,0.18) ${pct}% 100%)` }}>
+    <div className="mini-donut" style={{ background: `conic-gradient(#22D3EE 0% ${pct}%, rgba(255,255,255,0.12) ${pct}% 100%)` }}>
       <div className="mini-donut-center">{pct}%</div>
     </div>
   );
@@ -858,22 +858,23 @@ function DashboardSkeleton() {
   );
 }
 
-function RadialGauge({ pct, color, label }) {
-  const r = 30;
+function RadialGauge({ pct, color, label, size = 72, thickness = 7 }) {
+  const r = (size - thickness) / 2;
+  const c = size / 2;
   const circumference = 2 * Math.PI * r;
   const offset = circumference - (circumference * (pct || 0)) / 100;
   return (
     <div style={{ textAlign: 'center' }}>
-      <svg width="72" height="72" viewBox="0 0 72 72">
-        <circle cx="36" cy="36" r={r} fill="none" stroke="#1B2540" strokeWidth="7" />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="#1B2540" strokeWidth={thickness} />
         <circle
-          cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="7"
+          cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth={thickness}
           strokeDasharray={circumference} strokeDashoffset={offset}
-          strokeLinecap="round" transform="rotate(-90 36 36)"
+          strokeLinecap="round" transform={`rotate(-90 ${c} ${c})`}
         />
-        <text x="36" y="41" fill="#E7ECFB" fontSize="15" fontWeight="700" textAnchor="middle">{pct}%</text>
+        <text x={c} y={c + size * 0.07} fill="#E7ECFB" fontSize={size * 0.21} fontWeight="700" textAnchor="middle">{pct}%</text>
       </svg>
-      <div style={{ color: '#8B96B3', fontSize: 11, marginTop: 2 }}>{label}</div>
+      {label && <div style={{ color: '#8B96B3', fontSize: 11, marginTop: 2 }}>{label}</div>}
     </div>
   );
 }
@@ -1022,8 +1023,13 @@ function ExpiringAlertsList({ items }) {
     <div className="dashboard-expiring-list">
       {items.map((it, idx) => (
         <div className="dashboard-expiring-row" key={idx}>
-          <div className="dashboard-expiring-name">{it.item_name}</div>
-          <div className="dashboard-expiring-loc">{it.location_label}</div>
+          <div className="dashboard-expiring-top">
+            <span className="dashboard-expiring-ic">🗓️</span>
+            <div>
+              <div className="dashboard-expiring-name">{it.item_name}</div>
+              <div className="dashboard-expiring-loc">{it.location_label}</div>
+            </div>
+          </div>
           <span className={`med-status-pill ${it.status === 'EXPIRED' ? 'med-status-expired' : 'med-status-near'}`}>
             {it.status === 'EXPIRED' ? 'หมดอายุแล้ว' : 'ใกล้หมดอายุ'} · {it.expiry_date}
           </span>
@@ -1033,7 +1039,114 @@ function ExpiringAlertsList({ items }) {
   );
 }
 
-function DashboardScreen({ onBack }) {
+// -------------------------------------------------------------------------
+// Dashboard shell ใหม่: sidebar + topbar + การ์ดสรุป (ตามดีไซน์ที่อนุมัติ)
+// -------------------------------------------------------------------------
+const DASHBOARD_NAV = [
+  { key: 'overview', icon: '🏠', label: 'แดชบอร์ด' },
+  { key: 'reportSummary', icon: '📄', label: 'รายงานสรุป' },
+  { key: 'reportDetail', icon: '📋', label: 'รายงานละเอียด' },
+  { key: 'operations', icon: '🗓️', label: 'ปฏิบัติการตรวจ' },
+  { key: 'insight', icon: '📊', label: 'เปรียบเทียบตามหมวด' },
+  { key: 'notready', icon: '⛔', label: 'รายการไม่พร้อมใช้' },
+  { key: 'ack', icon: '✅', label: 'การรับทราบผู้รับผิดชอบรถ' },
+  { key: 'expiring', icon: '⏳', label: 'ใกล้หมดอายุ' },
+  { key: 'settings', icon: '⚙️', label: 'ตั้งค่า' },
+];
+
+function DashboardSidebar({ activeKey, onNavigate }) {
+  return (
+    <aside className="dsb-sidebar">
+      <div className="dsb-brand">
+        <span className="dsb-brand-ic">🛡️</span>
+        <span className="dsb-brand-text">AOT Medical Check</span>
+      </div>
+      <nav className="dsb-nav">
+        {DASHBOARD_NAV.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`dsb-nav-item ${activeKey === item.key ? 'dsb-nav-item-active' : ''}`}
+            onClick={() => onNavigate(item.key)}
+          >
+            <span className="dsb-nav-ic">{item.icon}</span>
+            <span className="dsb-nav-label">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+function DashboardTopBar({ user, alertCount, onExit }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <header className="dtb-bar">
+      <div className="dtb-clock">
+        <span className="dtb-clock-ic">🕐</span>
+        <div>
+          <div className="dtb-clock-label">อัปเดตล่าสุด</div>
+          <div className="dtb-clock-value">
+            {now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · {now.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </div>
+        </div>
+      </div>
+      <div className="dtb-right">
+        <div className="dtb-bell">
+          🔔
+          {alertCount > 0 && <span className="dtb-bell-badge">{alertCount}</span>}
+        </div>
+        <div className="dtb-user">
+          <div className="dtb-user-avatar">👤</div>
+          <div>
+            <div className="dtb-user-name">{user.name}</div>
+            <div className="dtb-user-role">{ROLES[user.role]?.label || user.role}</div>
+          </div>
+        </div>
+        <button type="button" className="dtb-exit" onClick={onExit}>ออก</button>
+      </div>
+    </header>
+  );
+}
+
+function StatCardReadiness({ pct, detail, periodLabel }) {
+  return (
+    <div className="dstat-card">
+      <div>
+        <div className="dstat-label">ความพร้อมใช้งาน ({periodLabel})</div>
+        <div className="dstat-big">{pct !== null ? `${pct}%` : '–'}</div>
+        <div className="dstat-detail">{detail}</div>
+      </div>
+      <RadialGauge pct={pct || 0} color="#22D3EE" label="" size={92} thickness={9} />
+    </div>
+  );
+}
+
+function StatCardCompliance({ icon, label, done, total }) {
+  const missing = Math.max(total - done, 0);
+  const complete = total > 0 && missing === 0;
+  return (
+    <div className="dstat-card dstat-card-compliance">
+      <div>
+        <div className="dstat-label">{label}</div>
+        {total === 0 ? (
+          <div className="dstat-compliance-text">ไม่มีข้อมูล</div>
+        ) : complete ? (
+          <div className="dstat-compliance-text dstat-compliance-ok">ครบแล้ว <b>{done}/{total}</b> คัน</div>
+        ) : (
+          <div className="dstat-compliance-text">ยังขาด <b>{missing}/{total}</b> คัน</div>
+        )}
+      </div>
+      <div className={`dstat-icon-box ${complete ? 'dstat-icon-box-ok' : ''}`}>{icon}</div>
+    </div>
+  );
+}
+
+function DashboardScreen({ user, onBack }) {
   const [period, setPeriod] = useState('today');
   const [summary, setSummary] = useState([]);
   const [notReady, setNotReady] = useState([]);
@@ -1044,6 +1157,11 @@ function DashboardScreen({ onBack }) {
   const [ackSummary, setAckSummary] = useState([]);
   const [selectedNotReady, setSelectedNotReady] = useState(null);
   const [showCategoryInsight, setShowCategoryInsight] = useState(false);
+  const [overallTrend, setOverallTrend] = useState([]);
+
+  const notReadyRef = useRef(null);
+  const ackRef = useRef(null);
+  const expiringRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -1069,7 +1187,39 @@ function DashboardScreen({ onBack }) {
     })();
   }, [period]);
 
+  useEffect(() => {
+    getOverallReadinessTrend(14).then((res) => setOverallTrend(res.data || []));
+  }, []);
+
   const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label || '';
+
+  const totalReady = summary.reduce((s, r) => s + Number(r.ready_count), 0);
+  const totalNotReady = summary.reduce((s, r) => s + Number(r.not_ready_count), 0);
+  const totalChecked = totalReady + totalNotReady;
+  const readyPct = totalChecked > 0 ? Math.round((totalReady / totalChecked) * 100) : null;
+  const readyDetail = totalChecked > 0
+    ? `${totalReady} พร้อมใช้ • ${totalNotReady} ไม่พร้อมใช้ จาก ${totalChecked} จุดที่ตรวจ`
+    : 'ยังไม่มีการตรวจสอบในช่วงนี้';
+
+  const dailyRow = compliance.find((r) => r.module_key === 'ambulance_daily') || { total_count: 0, done_count: 0 };
+  const weeklyRow = compliance.find((r) => r.module_key === 'ambulance_weekly') || { total_count: 0, done_count: 0 };
+
+  const validTrend = overallTrend.filter((t) => t.ready_pct !== null && t.ready_pct !== undefined);
+  const last7 = validTrend.slice(-7);
+  const weekAvg = last7.length > 0 ? Math.round(last7.reduce((s, t) => s + Number(t.ready_pct), 0) / last7.length) : 0;
+  const fullAvg = validTrend.length > 0 ? Math.round(validTrend.reduce((s, t) => s + Number(t.ready_pct), 0) / validTrend.length) : 0;
+
+  const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const handleNav = (key) => {
+    if (key === 'reportSummary') generateMonthlyReportPDF();
+    else if (key === 'reportDetail') generateDetailedMonthlyReportPDF();
+    else if (key === 'insight') setShowCategoryInsight(true);
+    else if (key === 'operations') onBack();
+    else if (key === 'notready') scrollTo(notReadyRef);
+    else if (key === 'ack') scrollTo(ackRef);
+    else if (key === 'expiring') scrollTo(expiringRef);
+  };
 
   if (selectedNotReady) {
     return <NotReadyDetailScreen item={selectedNotReady} onBack={() => setSelectedNotReady(null)} />;
@@ -1079,57 +1229,98 @@ function DashboardScreen({ onBack }) {
   }
 
   return (
-    <div className="screen dashboard-dark">
-      <TopBar title="Dashboard" sub="สรุปความพร้อมใช้งานภาพรวม" onBack={onBack} />
-      <main className="form-body dashboard-wide">
-        <div className="dash-period-tabs" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {PERIOD_OPTIONS.map((p) => (
-              <button key={p.key} className={`dash-period-tab ${period === p.key ? 'dash-period-tab-active' : ''}`} onClick={() => setPeriod(p.key)}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="dash-pdf-btn" onClick={() => generateMonthlyReportPDF()}>📄 รายงานสรุป</button>
-            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateDetailedMonthlyReportPDF()}>📋 รายงานละเอียด</button>
-            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
-            <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => setShowCategoryInsight(true)}>📊 เปรียบเทียบตามหมวด</button>
-          </div>
-        </div>
-
-        {loading && <DashboardSkeleton />}
-        {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
-        {!loading && !loadError && (
-          <>
-            <OverallReadinessCard summary={summary} periodLabel={periodLabel} />
-            <h3 className="dash-section-title">ความครบถ้วนของการตรวจตามรอบ</h3>
-            <ComplianceStrip compliance={compliance} />
-            <h3 className="dash-section-title">แยกตามหมวด</h3>
-            <CategoryGrid summary={summary} />
-            <h3 className="dash-section-title">รายจุดที่ยังไม่พร้อมใช้ ({periodLabel})</h3>
-            <NotReadyList items={notReady} onSelect={setSelectedNotReady} />
-            <h3 className="dash-section-title">การรับทราบของผู้รับผิดชอบรถ ({periodLabel})</h3>
-            <div className="dash-notready-list">
-              {ackSummary.length === 0 && <div className="empty-state">ยังไม่มีข้อมูลในช่วงเวลานี้</div>}
-              {ackSummary.map((row) => {
-                const complete = row.total_inspections > 0 && row.acknowledged_count >= row.total_inspections;
-                return (
-                  <div className="dash-notready-row" key={row.location_label}>
-                    <div>
-                      <div className="dash-notready-name">{row.location_label} · {row.responsible_name || 'ยังไม่กำหนดผู้รับผิดชอบ'}</div>
-                      <div className="dash-notready-sub">รับทราบแล้ว {row.acknowledged_count}/{row.total_inspections} รายการ</div>
-                    </div>
-                    <span className={`dash-pill ${complete ? 'pill-ok' : 'pill-warn'}`}>{complete ? 'ครบ' : 'ยังไม่ครบ'}</span>
-                  </div>
-                );
-              })}
+    <div className="dboard-shell dashboard-dark">
+      <DashboardSidebar activeKey="overview" onNavigate={handleNav} />
+      <div className="dboard-main">
+        <DashboardTopBar user={user} alertCount={notReady.length} onExit={onBack} />
+        <main className="dboard-content">
+          <div className="dboard-greeting">
+            <div>
+              <h1 className="dboard-greeting-title">สวัสดี, {user?.name}</h1>
+              <div className="dboard-greeting-sub">ภาพรวมการตรวจเช็คอุปกรณ์ทางการแพทย์</div>
             </div>
-            <h3 className="dash-section-title">รายการใกล้หมดอายุ / หมดอายุ</h3>
-            <ExpiringAlertsList items={expiring} />
-          </>
-        )}
-      </main>
+            <div className="filter-group">
+              <span className="filter-label">ช่วงเวลา</span>
+              <select className="filter-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
+                {PERIOD_OPTIONS.map((p) => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {loading && <DashboardSkeleton />}
+          {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
+          {!loading && !loadError && (
+            <>
+              <div className="dstat-row">
+                <StatCardReadiness pct={readyPct} detail={readyDetail} periodLabel={periodLabel} />
+                <StatCardCompliance icon="🚑" label="ตรวจประจำวัน (รถพยาบาล)" done={Number(dailyRow.done_count)} total={Number(dailyRow.total_count)} />
+                <StatCardCompliance icon="🗓️" label="ตรวจประจำสัปดาห์ (สัปดาห์นี้)" done={Number(weeklyRow.done_count)} total={Number(weeklyRow.total_count)} />
+              </div>
+
+              <h3 className="dash-section-title">แยกตามหมวด</h3>
+              <CategoryGrid summary={summary} />
+
+              <div className="dash-two-col" style={{ marginTop: 20 }}>
+                <div className="dstat-panel">
+                  <h3 className="dash-section-title" style={{ marginTop: 0 }}>เทรนด์ความพร้อมใช้งาน 14 วันล่าสุด</h3>
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={overallTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#26324A" />
+                        <XAxis dataKey="day" tickFormatter={(d) => d ? d.slice(5) : ''} stroke="#8B96B3" fontSize={11} />
+                        <YAxis domain={[0, 100]} stroke="#8B96B3" fontSize={11} />
+                        <Tooltip contentStyle={{ background: '#141B2E', border: '1px solid #26324A', color: '#E7ECFB' }} />
+                        <Line type="monotone" dataKey="ready_pct" stroke="#22D3EE" strokeWidth={3} dot={{ r: 3 }} connectNulls />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="dstat-panel">
+                  <h3 className="dash-section-title" style={{ marginTop: 0 }}>เปรียบเทียบความพร้อมใช้งาน</h3>
+                  <div className="dcompare-row">
+                    <RadialGauge pct={weekAvg} color="#22D3EE" label="เฉลี่ย 7 วันล่าสุด" size={110} thickness={10} />
+                    <RadialGauge pct={fullAvg} color="#A78BFA" label="เฉลี่ย 14 วันล่าสุด" size={110} thickness={10} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="dash-two-col" style={{ marginTop: 20 }} ref={notReadyRef}>
+                <div>
+                  <h3 className="dash-section-title" style={{ marginTop: 0 }}>รายการที่ยังไม่พร้อมใช้ ({periodLabel})</h3>
+                  <NotReadyList items={notReady} onSelect={setSelectedNotReady} />
+                </div>
+                <div ref={ackRef}>
+                  <h3 className="dash-section-title" style={{ marginTop: 0 }}>การรับทราบของผู้รับผิดชอบรถ ({periodLabel})</h3>
+                  <div className="dash-notready-list">
+                    {ackSummary.length === 0 && <div className="empty-state">ยังไม่มีข้อมูลในช่วงเวลานี้</div>}
+                    {ackSummary.map((row) => {
+                      const complete = row.total_inspections > 0 && row.acknowledged_count >= row.total_inspections;
+                      return (
+                        <div className="dash-notready-row" key={row.location_label}>
+                          <div>
+                            <div className="dash-notready-name">{row.location_label} · {row.responsible_name || 'ยังไม่กำหนดผู้รับผิดชอบ'}</div>
+                            <div className="dash-notready-sub">รับทราบแล้ว {row.acknowledged_count}/{row.total_inspections} รายการ</div>
+                          </div>
+                          <span className={`dash-pill ${complete ? 'pill-ok' : 'pill-warn'}`}>{complete ? 'ครบ' : 'ยังไม่ครบ'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="dash-section-title" ref={expiringRef}>ใกล้หมดอายุ / หมดอายุ</h3>
+              <ExpiringAlertsList items={expiring} />
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
+                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -1375,7 +1566,7 @@ export default function App() {
   }
 
   if (showDashboard) {
-    return <DashboardScreen onBack={() => setShowDashboard(false)} />;
+    return <DashboardScreen user={user} onBack={() => setShowDashboard(false)} />;
   }
 
   if (!activeCategory) {
