@@ -345,6 +345,15 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
             <div className="menu-card-dot" />
             <div className="menu-card-label">{m.label}</div>
             <div className="menu-card-subtitle">{m.subtitle}</div>
+            {m.moduleKey && (
+              <button
+                type="button"
+                className="menu-card-report-btn"
+                onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label, win); }}
+              >
+                📊 รายงานตารางรายเดือน
+              </button>
+            )}
           </button>
         ))}
       </main>
