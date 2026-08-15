@@ -4,6 +4,7 @@ import { sarabunRegularBase64 } from '../assets/fonts/sarabunRegularBase64';
 import { sarabunBoldBase64 } from '../assets/fonts/sarabunBoldBase64';
 import { getItemCalendarData } from './checklist';
 import { sharePDF } from './pdfShare';
+import { drawCheckIcon } from './pdfCheckmark';
 
 const NAVY = '#1B3A6B';
 const OK = '#1D9A63';
@@ -55,18 +56,35 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
   doc.text(`ประจำเดือน ${monthLabel(year, month)}`, 8, 18);
 
   const head = ['No.', 'รายการ', 'จำนวน', ...Array.from({ length: daysInMonth }, (_, i) => String(i + 1))];
-  const body = items.map((it, idx) => [
-    String(idx + 1),
-    it.item_name,
-    it.standard_qty || '',
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const status = statusMap[`${it.item_id}-${day}`];
-      if (status === 'OK') return 'OK';
-      if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
-      return '';
-    }),
-  ]);
+
+  // จัดกลุ่มวันเป็น "สัปดาห์" ตามปฏิทิน (ขึ้นสัปดาห์ใหม่ทุกวันอาทิตย์)
+  const dayToWeek = {};
+  let weekIdx = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month - 1, d).getDay();
+    if (dow === 0 && d !== 1) weekIdx += 1;
+    dayToWeek[d] = weekIdx;
+  }
+
+  const body = items.map((it, idx) => {
+    // ถ้าสัปดาห์ไหนมีการติ๊ก OK อย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้นตรวจครบ (OK ทุกวันในสัปดาห์นั้น)
+    const okWeeks = new Set();
+    for (let d = 1; d <= daysInMonth; d++) {
+      if (statusMap[`${it.item_id}-${d}`] === 'OK') okWeeks.add(dayToWeek[d]);
+    }
+    return [
+      String(idx + 1),
+      it.item_name,
+      it.standard_qty || '',
+      ...Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1;
+        const status = statusMap[`${it.item_id}-${day}`];
+        if (status === 'OK' || okWeeks.has(dayToWeek[day])) return 'OK';
+        if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
+        return '';
+      }),
+    ];
+  });
 
   autoTable(doc, {
     startY: 24,
@@ -84,12 +102,18 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       const colIdx = data.column.index;
       const day = colIdx - 2;
       if (data.section === 'body' && colIdx >= 3) {
-        if (data.cell.raw === 'OK') data.cell.styles.textColor = OK;
+        if (data.cell.raw === 'OK') data.cell.text = [];
         else if (data.cell.raw === 'X') data.cell.styles.textColor = BAD;
         if (weekendDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
       }
       if (data.section === 'head' && colIdx >= 3 && weekendDays.has(day)) {
         data.cell.styles.fillColor = WEEKEND_HEAD_BG;
+      }
+    },
+    didDrawCell: (data) => {
+      const colIdx = data.column.index;
+      if (data.section === 'body' && colIdx >= 3 && data.cell.raw === 'OK') {
+        drawCheckIcon(doc, data.cell, OK);
       }
     },
   });

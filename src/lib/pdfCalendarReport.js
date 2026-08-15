@@ -4,6 +4,7 @@ import { sarabunRegularBase64 } from '../assets/fonts/sarabunRegularBase64';
 import { sarabunBoldBase64 } from '../assets/fonts/sarabunBoldBase64';
 import { getDailyCalendar, getWeeklyCalendar } from './checklist';
 import { sharePDF } from './pdfShare';
+import { drawCheckIcon } from './pdfCheckmark';
 
 const NAVY = '#1B3A6B';
 const OK = '#1D9A63';
@@ -85,9 +86,14 @@ export async function generateComplianceCalendarPDF(preOpenedWindow) {
     margin: { left: 14, right: 14 },
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index > 0) {
-        if (data.cell.raw === 'OK') data.cell.styles.textColor = OK;
+        if (data.cell.raw === 'OK') data.cell.text = [];
         else if (data.cell.raw === '-') data.cell.styles.textColor = '#C4CBD6';
         else data.cell.styles.textColor = BAD;
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body' && data.column.index > 0 && data.cell.raw === 'OK') {
+        drawCheckIcon(doc, data.cell, OK);
       }
     },
   });
@@ -123,7 +129,13 @@ export async function generateComplianceCalendarPDF(preOpenedWindow) {
     margin: { left: 14, right: 14 },
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index > 0) {
-        data.cell.styles.textColor = data.cell.raw === 'OK' ? OK : BAD;
+        if (data.cell.raw === 'OK') data.cell.text = [];
+        else data.cell.styles.textColor = BAD;
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section === 'body' && data.column.index > 0 && data.cell.raw === 'OK') {
+        drawCheckIcon(doc, data.cell, OK);
       }
     },
   });
