@@ -448,12 +448,12 @@ body {
   width: 232px; flex-shrink: 0; background: #0E1526; border-right: 1px solid #1B2540;
   display: flex; flex-direction: column; padding: 18px 12px;
 }
-.dsb-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 20px; }
+.dsb-brand { display: flex; align-items: flex-start; gap: 10px; padding: 6px 10px 20px; }
 .dsb-brand-ic {
   width: 34px; height: 34px; border-radius: 9px; background: rgba(34,211,238,0.15);
   display: flex; align-items: center; justify-content: center; font-size: 17px;
 }
-.dsb-brand-text { color: #E7ECFB; font-weight: 700; font-size: 14px; }
+.dsb-brand-text { color: #E7ECFB; font-weight: 700; font-size: 14px; line-height: 1.3; padding-top: 6px; }
 .dsb-nav { display: flex; flex-direction: column; gap: 3px; }
 .dsb-nav-item {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;

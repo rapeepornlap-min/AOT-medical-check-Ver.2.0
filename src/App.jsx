@@ -83,7 +83,7 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
     <div className="screen center">
       <div className="auth-card">
         <img src={logo} alt="AOT Airport Clinic" style={{ width: '100%', maxWidth: 260, margin: '0 auto 16px', display: 'block' }} />
-        <h1 className="auth-title">Medical <span className="auth-title-accent">Checklist</span></h1>
+        <h1 className="auth-title">AOT Medical Readiness <span className="auth-title-accent">System</span></h1>
         <p className="auth-subtitle">รถพยาบาล · อุปกรณ์ · เวชภัณฑ์ · ยา</p>
         <form onSubmit={handleSubmit} className="auth-form">
           <label className="field-label" htmlFor="username">ชื่อผู้ใช้ (Username)</label>
@@ -162,7 +162,7 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
 
   return (
     <div className="screen">
-      <TopBar title="AOT MEDICAL CLINIC" sub={`${user.name} · ${ROLES[user.role]?.label || user.role}`} onBack={onLogout} backLabel="ออกจากระบบ" />
+      <TopBar title="AOT MEDICAL READINESS SYSTEM" sub={`${user.name} · ${ROLES[user.role]?.label || user.role}`} onBack={onLogout} backLabel="ออกจากระบบ" />
       <main className="menu-grid">
         {loading && <div className="empty-state">กำลังโหลดรายการ...</div>}
         {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
@@ -1078,7 +1078,7 @@ function DashboardSidebar({ activeKey, onNavigate }) {
     <aside className="dsb-sidebar">
       <div className="dsb-brand">
         <span className="dsb-brand-ic">🛡️</span>
-        <span className="dsb-brand-text">AOT Medical Check</span>
+        <span className="dsb-brand-text">AOT Medical Readiness System</span>
       </div>
       <nav className="dsb-nav">
         {DASHBOARD_NAV.map((item) => (
