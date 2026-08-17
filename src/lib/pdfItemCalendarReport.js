@@ -9,6 +9,7 @@ import { drawCheckIcon } from './pdfCheckmark';
 const NAVY = '#1B3A6B';
 const OK = '#1D9A63';
 const BAD = '#D64545';
+const WARN = '#B8760A';
 const WEEKEND_BG = '#D9D9D9';
 const WEEKEND_HEAD_BG = '#8B93A3';
 
@@ -86,6 +87,8 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       ...Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;
         const status = statusMap[`${it.item_id}-${day}`];
+        // ใกล้หมดอายุ ต้องขึ้นเครื่องหมาย "/" เตือนเสมอ ไม่ให้กฎเติมครบสัปดาห์บังหายไป
+        if (status === 'NEAR') return 'NEAR';
         if (nonWorkDays.has(day)) {
           if (status === 'OK') return 'OK';
           if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
@@ -116,6 +119,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       if (data.section === 'body' && colIdx >= 3) {
         if (data.cell.raw === 'OK') data.cell.text = [];
         else if (data.cell.raw === 'X') data.cell.styles.textColor = BAD;
+        else if (data.cell.raw === 'NEAR') { data.cell.text = ['/']; data.cell.styles.textColor = WARN; data.cell.styles.fontStyle = 'bold'; }
         else if (data.cell.raw === '-') data.cell.styles.textColor = '#9AA5B5';
         if (nonWorkDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
       }
@@ -137,7 +141,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFont('Sarabun', 'normal');
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
-    doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
+    doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) · "/" สีส้ม หมายถึงใกล้หมดอายุ — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
   }
 
