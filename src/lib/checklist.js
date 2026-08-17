@@ -40,7 +40,7 @@ export async function getLatestInspectionAnswers(locationCode, moduleKey) {
 
   const { data: lastInspection, error: insError } = await supabase
     .from('inspections')
-    .select('id')
+    .select('id, submitted_at')
     .eq('location_id', location.id)
     .eq('module_key', moduleKey)
     .order('submitted_at', { ascending: false })
@@ -54,8 +54,25 @@ export async function getLatestInspectionAnswers(locationCode, moduleKey) {
     .eq('inspection_id', lastInspection.id);
   if (itemsError || !items) return { data: {} };
 
+  // "จำนวนที่ตรวจนับได้จริง" และ "สถานะครบ/ไม่ครบ" ให้ค้างไว้ใช้ได้ตลอดสัปดาห์เดิมที่ตรวจ แต่พอขึ้นสัปดาห์ใหม่
+  // (เริ่มวันจันทร์) ให้เคลียร์ทั้งสองค่านี้ทิ้ง บังคับให้ตรวจและนับใหม่ (ฟิลด์อื่น เช่น วันหมดอายุ/หมายเหตุ ยังคง prefill ตามเดิม)
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const nowBkk = new Date(Date.now() + BKK_OFFSET_MS);
+  const dow = nowBkk.getUTCDay(); // 0=อาทิตย์..6=เสาร์ (เวลากรุงเทพฯ)
+  const diffToMonday = dow === 0 ? 6 : dow - 1;
+  const weekStartBkk = new Date(Date.UTC(nowBkk.getUTCFullYear(), nowBkk.getUTCMonth(), nowBkk.getUTCDate() - diffToMonday));
+  const weekStartUtc = new Date(weekStartBkk.getTime() - BKK_OFFSET_MS);
+  const isSameWeek = new Date(lastInspection.submitted_at) >= weekStartUtc;
+
   const map = {};
-  items.forEach((it) => { map[it.item_code] = it; });
+  items.forEach((it) => {
+    const entry = { ...it };
+    if (!isSameWeek) {
+      delete entry.amount;
+      delete entry.status;
+    }
+    map[it.item_code] = entry;
+  });
   return { data: map };
 }
 /**
