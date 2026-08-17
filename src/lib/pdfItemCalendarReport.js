@@ -119,7 +119,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       if (data.section === 'body' && colIdx >= 3) {
         if (data.cell.raw === 'OK') data.cell.text = [];
         else if (data.cell.raw === 'X') data.cell.styles.textColor = BAD;
-        else if (data.cell.raw === 'NEAR') { data.cell.text = ['/']; data.cell.styles.textColor = WARN; data.cell.styles.fontStyle = 'bold'; }
+        else if (data.cell.raw === 'NEAR') data.cell.text = [];
         else if (data.cell.raw === '-') data.cell.styles.textColor = '#9AA5B5';
         if (nonWorkDays.has(day)) data.cell.styles.fillColor = WEEKEND_BG;
       }
@@ -132,6 +132,9 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       if (data.section === 'body' && colIdx >= 3 && data.cell.raw === 'OK') {
         drawCheckIcon(doc, data.cell, OK);
       }
+      if (data.section === 'body' && colIdx >= 3 && data.cell.raw === 'NEAR') {
+        drawCheckIcon(doc, data.cell, WARN);
+      }
     },
   });
 
@@ -141,7 +144,7 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFont('Sarabun', 'normal');
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
-    doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) · "/" สีส้ม หมายถึงใกล้หมดอายุ — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
+    doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) · เครื่องหมายถูกสีส้ม หมายถึงใกล้หมดอายุ — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
   }
 
