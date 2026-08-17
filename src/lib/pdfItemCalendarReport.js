@@ -74,11 +74,15 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
   }
 
   const body = items.map((it, idx) => {
-    // ถ้าสัปดาห์ไหนมีการติ๊ก OK ในวันทำงานอย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้น (เฉพาะวันทำงาน) ตรวจครบ
+    // ถ้าสัปดาห์ไหนมีการติ๊ก OK หรือใกล้หมดอายุ ในวันทำงานอย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้น (เฉพาะวันทำงาน) ตรวจครบ
     // เว้นเสาร์-อาทิตย์และวันหยุดนักขัตฤกษ์ไว้เสมอ ไม่เติมเครื่องหมายถูกอัตโนมัติให้
     const okWeeks = new Set();
+    const nearWeeks = new Set();
     for (let d = 1; d <= daysInMonth; d++) {
-      if (!nonWorkDays.has(d) && statusMap[`${it.item_id}-${d}`] === 'OK') okWeeks.add(dayToWeek[d]);
+      if (nonWorkDays.has(d)) continue;
+      const s = statusMap[`${it.item_id}-${d}`];
+      if (s === 'OK') okWeeks.add(dayToWeek[d]);
+      else if (s === 'NEAR') nearWeeks.add(dayToWeek[d]);
     }
     return [
       String(idx + 1),
@@ -87,13 +91,14 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       ...Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;
         const status = statusMap[`${it.item_id}-${day}`];
-        // ใกล้หมดอายุ ต้องขึ้นเครื่องหมาย "/" เตือนเสมอ ไม่ให้กฎเติมครบสัปดาห์บังหายไป
-        if (status === 'NEAR') return 'NEAR';
         if (nonWorkDays.has(day)) {
           if (status === 'OK') return 'OK';
+          if (status === 'NEAR') return 'NEAR';
           if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
           return '-';
         }
+        // ใกล้หมดอายุ มีสิทธิ์เหนือกว่า: ถ้าสัปดาห์นี้มีวันที่ใกล้หมดอายุ ให้ติ๊กเตือนสีส้มครบทั้งสัปดาห์
+        if (nearWeeks.has(dayToWeek[day])) return 'NEAR';
         if (status === 'OK' || okWeeks.has(dayToWeek[day])) return 'OK';
         if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
         return '';
