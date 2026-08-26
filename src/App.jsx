@@ -34,6 +34,23 @@ function medStatus(dateStr) {
 const medStatusLabel = { OK: 'ปกติ', NEAR: 'ใกล้หมด', EXPIRED: 'หมดอายุ', UNSET: 'ยังไม่ระบุ' };
 const medStatusClass = { OK: 'med-status-ok', NEAR: 'med-status-near', EXPIRED: 'med-status-expired', UNSET: 'med-status-unset' };
 
+// เทียบจำนวนที่ตรวจนับได้จริงกับมาตรฐาน (รองรับทั้งเลขเดี่ยวและแบบ comma "1,1")
+// เท่ากับมาตรฐานทุกตัว -> 'OK' (ครบ), น้อยกว่ามาตรฐานตัวใดตัวหนึ่ง -> 'NOT_OK' (ไม่ครบ)
+// กรณีอื่น (มากกว่ามาตรฐาน, กรอกไม่ครบ/ไม่ใช่ตัวเลข) -> null คือไม่ auto เปลี่ยนสถานะให้
+function compareAmountToStandard(amountStr, standardStr) {
+  if (!standardStr || amountStr === undefined || amountStr === '') return null;
+  const stdParts = String(standardStr).split(',').map((s) => s.trim());
+  const amtParts = String(amountStr).split(',').map((s) => s.trim());
+  if (stdParts.length !== amtParts.length) return null;
+  if (stdParts.some((s) => s === '' || isNaN(Number(s)))) return null;
+  if (amtParts.some((s) => s === '' || isNaN(Number(s)))) return null;
+  const stdNums = stdParts.map(Number);
+  const amtNums = amtParts.map(Number);
+  if (stdNums.every((n, i) => amtNums[i] === n)) return 'OK';
+  if (stdNums.some((n, i) => amtNums[i] < n)) return 'NOT_OK';
+  return null;
+}
+
 function LiveClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -648,7 +665,18 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                         <>
                           <div className="field-label" style={{ marginTop: 10, marginBottom: 6 }}>จำนวนที่ตรวจนับได้จริง</div>
                           <div className="med-row">
-                            <input type="text" className="text-input" style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }} placeholder={`มาตรฐาน ${it.standard_qty}`} value={a.amount || ''} onChange={(e) => setAnswer(it.id, { amount: e.target.value })} />
+                            <input
+                              type="text"
+                              className="text-input"
+                              style={{ fontSize: 22, fontWeight: 700, textAlign: 'center' }}
+                              placeholder={`มาตรฐาน ${it.standard_qty}`}
+                              value={a.amount || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const autoStatus = compareAmountToStandard(val, it.standard_qty);
+                                setAnswer(it.id, autoStatus ? { amount: val, status: autoStatus } : { amount: val });
+                              }}
+                            />
                             {it.unit && <span className="unit-label">{it.unit}</span>}
                           </div>
                         </>
