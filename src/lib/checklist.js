@@ -190,11 +190,22 @@ export async function getLocationsWithResponsible(role) {
 export async function getLatestStatusByLocation(locationIds) {
   const { data, error } = await supabase
     .from('latest_inspection_per_location')
-    .select('location_id, module_key, overall_status')
+    .select('location_id, module_key, overall_status, submitted_at')
     .in('location_id', locationIds);
   if (error) return { error: error.message };
+
+  // นับว่า "ตรวจแล้ว" เฉพาะการตรวจที่อยู่ในสัปดาห์นี้เท่านั้น (ขึ้นสัปดาห์ใหม่ทุกวันจันทร์)
+  // ให้สอดคล้องกับกฎ "นับ/ตรวจครั้งเดียวต่อสัปดาห์" — การตรวจจากสัปดาห์ก่อนถือว่ายังไม่ตรวจของสัปดาห์นี้
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const nowBkk = new Date(Date.now() + BKK_OFFSET_MS);
+  const dow = nowBkk.getUTCDay();
+  const diffToMonday = dow === 0 ? 6 : dow - 1;
+  const weekStartBkk = new Date(Date.UTC(nowBkk.getUTCFullYear(), nowBkk.getUTCMonth(), nowBkk.getUTCDate() - diffToMonday));
+  const weekStartUtc = new Date(weekStartBkk.getTime() - BKK_OFFSET_MS);
+
   const map = {};
   data.forEach((row) => {
+    if (new Date(row.submitted_at) < weekStartUtc) return; // เก่ากว่าสัปดาห์นี้ ไม่นับว่าตรวจแล้ว
     if (!map[row.location_id]) map[row.location_id] = {};
     map[row.location_id][row.module_key] = row.overall_status;
   });
