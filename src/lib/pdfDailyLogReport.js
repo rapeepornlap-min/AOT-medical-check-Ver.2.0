@@ -28,7 +28,7 @@ function dayOfWeekLabel(year, month, day) {
   return new Date(year, month - 1, day).toLocaleDateString('th-TH', { weekday: 'short' });
 }
 
-export async function generateDailyLogReportPDF(locationCode, preOpenedWindow) {
+export async function generateDailyLogReportPDF(locationCode) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -132,5 +132,5 @@ export async function generateDailyLogReportPDF(locationCode, preOpenedWindow) {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 14, 288);
   }
 
-  await sharePDF(doc, `บันทึกประจำวัน_${locationLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`, preOpenedWindow);
+  await sharePDF(doc, `บันทึกประจำวัน_${locationLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
 }

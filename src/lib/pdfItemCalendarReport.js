@@ -25,7 +25,7 @@ function monthLabel(year, month) {
   return new Date(year, month - 1, 1).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
 }
 
-export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel, preOpenedWindow) {
+export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -153,5 +153,5 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
   }
 
-  await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`, preOpenedWindow);
+  await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
 }

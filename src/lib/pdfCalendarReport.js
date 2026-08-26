@@ -30,7 +30,7 @@ function buildGrid(rows, columnKey) {
   return { vehicles, columns, map };
 }
 
-export async function generateComplianceCalendarPDF(preOpenedWindow) {
+export async function generateComplianceCalendarPDF() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -149,5 +149,5 @@ export async function generateComplianceCalendarPDF(preOpenedWindow) {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 14, 202);
   }
 
-  await sharePDF(doc, `ปฏิทินการตรวจ_${monthLabel(now).replace(' ', '_')}.pdf`, preOpenedWindow);
+  await sharePDF(doc, `ปฏิทินการตรวจ_${monthLabel(now).replace(' ', '_')}.pdf`);
 }

@@ -320,7 +320,7 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             <button
               type="button"
               className="menu-card-report-btn"
-              onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateItemCalendarPDF(location.code, g.moduleKey, g.label, win); }}
+              onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(location.code, g.moduleKey, g.label); }}
             >
               📊 รายงานตารางรายเดือน
             </button>
@@ -350,7 +350,7 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
               <button
                 type="button"
                 className="menu-card-report-btn"
-                onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label, win); }}
+                onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label); }}
               >
                 📊 รายงานตารางรายเดือน
               </button>
@@ -359,7 +359,7 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
               <button
                 type="button"
                 className="menu-card-report-btn"
-                onClick={(e) => { e.stopPropagation(); const win = window.open('', '_blank'); generateDailyLogReportPDF(vehicle.code, win); }}
+                onClick={(e) => { e.stopPropagation(); generateDailyLogReportPDF(vehicle.code); }}
               >
                 📊 รายงานตารางรายเดือน
               </button>
@@ -1231,8 +1231,8 @@ function DashboardScreen({ user, onBack }) {
   const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const handleNav = (key) => {
-    if (key === 'reportSummary') { const win = window.open('', '_blank'); generateMonthlyReportPDF(win); }
-    else if (key === 'reportDetail') { const win = window.open('', '_blank'); generateDetailedMonthlyReportPDF(win); }
+    if (key === 'reportSummary') generateMonthlyReportPDF();
+    else if (key === 'reportDetail') generateDetailedMonthlyReportPDF();
     else if (key === 'insight') setShowCategoryInsight(true);
     else if (key === 'operations') onBack();
     else if (key === 'notready') scrollTo(notReadyRef);
@@ -1334,7 +1334,7 @@ function DashboardScreen({ user, onBack }) {
               <ExpiringAlertsList items={expiring} />
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => { const win = window.open('', '_blank'); generateComplianceCalendarPDF(win); }}>🗓️ ปฏิทินการตรวจ</button>
+                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
               </div>
             </>
           )}
@@ -1556,6 +1556,27 @@ function GenericWorkspace({ category, user, onExit }) {
 }
 
 // -------------------------------------------------------------------------
+// ตัวแสดง PDF ในหน้าเดิม (แทนการเปิดแท็บ/หน้าต่างใหม่ ซึ่งใช้ไม่ได้ใน in-app browser หลายตัว)
+// -------------------------------------------------------------------------
+function PdfViewerModal({ pdf, onClose }) {
+  if (!pdf) return null;
+  return (
+    <div className="pdf-modal-overlay" onClick={onClose}>
+      <div className="pdf-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="pdf-modal-header">
+          <span className="pdf-modal-title">{pdf.filename}</span>
+          <div className="pdf-modal-actions">
+            <a className="pdf-modal-btn" href={pdf.dataUrl} download={pdf.filename}>⬇ ดาวน์โหลด</a>
+            <button type="button" className="pdf-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+          </div>
+        </div>
+        <iframe title={pdf.filename} src={pdf.dataUrl} className="pdf-modal-iframe" />
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
 // App หลัก
 // -------------------------------------------------------------------------
 export default function App() {
@@ -1564,6 +1585,13 @@ export default function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPendingAck, setShowPendingAck] = useState(false);
+  const [pdfModal, setPdfModal] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => setPdfModal(e.detail);
+    window.addEventListener('aot-show-pdf', handler);
+    return () => window.removeEventListener('aot-show-pdf', handler);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -1573,28 +1601,27 @@ export default function App() {
     setShowPendingAck(false);
   };
 
+  let screen;
   if (!user) {
-    if (showForgotPassword) {
-      return <ChangePasswordScreen onBack={() => setShowForgotPassword(false)} />;
-    }
-    return <LoginScreen onLoggedIn={setUser} onForgotPassword={() => setShowForgotPassword(true)} />;
+    screen = showForgotPassword
+      ? <ChangePasswordScreen onBack={() => setShowForgotPassword(false)} />
+      : <LoginScreen onLoggedIn={setUser} onForgotPassword={() => setShowForgotPassword(true)} />;
+  } else if (showPendingAck) {
+    screen = <PendingAcknowledgmentsScreen user={user} onBack={() => setShowPendingAck(false)} />;
+  } else if (showDashboard) {
+    screen = <DashboardScreen user={user} onBack={() => setShowDashboard(false)} />;
+  } else if (!activeCategory) {
+    screen = <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} />;
+  } else if (activeCategory.id === 'AMBULANCE') {
+    screen = <AmbulanceWorkspace locations={activeCategory.locations} user={user} onExit={() => setActiveCategory(null)} />;
+  } else {
+    screen = <GenericWorkspace category={activeCategory} user={user} onExit={() => setActiveCategory(null)} />;
   }
 
-  if (showPendingAck) {
-    return <PendingAcknowledgmentsScreen user={user} onBack={() => setShowPendingAck(false)} />;
-  }
-
-  if (showDashboard) {
-    return <DashboardScreen user={user} onBack={() => setShowDashboard(false)} />;
-  }
-
-  if (!activeCategory) {
-    return <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} />;
-  }
-
-  if (activeCategory.id === 'AMBULANCE') {
-    return <AmbulanceWorkspace locations={activeCategory.locations} user={user} onExit={() => setActiveCategory(null)} />;
-  }
-
-  return <GenericWorkspace category={activeCategory} user={user} onExit={() => setActiveCategory(null)} />;
+  return (
+    <>
+      {screen}
+      <PdfViewerModal pdf={pdfModal} onClose={() => setPdfModal(null)} />
+    </>
+  );
 }

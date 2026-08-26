@@ -24,7 +24,7 @@ function monthLabel(date) {
   return date.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
 }
 
-export async function generateMonthlyReportPDF(preOpenedWindow) {
+export async function generateMonthlyReportPDF() {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -173,5 +173,5 @@ export async function generateMonthlyReportPDF(preOpenedWindow) {
     doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 18, 289);
   }
 
-  await sharePDF(doc, `รายงานความพร้อมใช้งาน_${monthLabel(now).replace(' ', '_')}.pdf`, preOpenedWindow);
+  await sharePDF(doc, `รายงานความพร้อมใช้งาน_${monthLabel(now).replace(' ', '_')}.pdf`);
 }
