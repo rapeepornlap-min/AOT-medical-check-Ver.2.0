@@ -249,6 +249,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
     let base;
     if (expected.length === 0) base = undefined;
     else if (expected.some((k) => checked[k] === 'NOT_READY')) base = 'NOT_READY';
+    else if (expected.some((k) => checked[k] === 'PARTIAL')) base = 'PARTIAL';
     else {
       const missing = expected.filter((k) => !(k in checked));
       if (missing.length > 0) {
@@ -330,8 +331,8 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             : g.accent === '#B8760A' ? 'menu-card-yellow'
             : g.accent === '#D64545' ? 'menu-card-red' : '';
           const checkedStatus = moduleStatus[g.moduleKey];
-          const checkedPillClass = checkedStatus === 'READY' ? 'pill-ok' : checkedStatus === 'NOT_READY' ? 'pill-danger' : 'pill-none';
-          const checkedPillLabel = checkedStatus === 'READY' ? '✓ ตรวจแล้ว' : checkedStatus === 'NOT_READY' ? '✓ ตรวจแล้ว (พบปัญหา)' : 'ยังไม่ตรวจ';
+          const checkedPillClass = checkedStatus === 'READY' ? 'pill-ok' : checkedStatus === 'NOT_READY' ? 'pill-danger' : checkedStatus === 'PARTIAL' ? 'pill-warn' : 'pill-none';
+          const checkedPillLabel = checkedStatus === 'READY' ? '✓ ตรวจแล้ว' : checkedStatus === 'NOT_READY' ? '✓ ตรวจแล้ว (พบปัญหา)' : checkedStatus === 'PARTIAL' ? '📝 ตรวจไม่ครบ (บันทึกร่างไว้)' : 'ยังไม่ตรวจ';
           return (
           <button
             key={g.moduleKey}
@@ -563,6 +564,19 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const problemCount = rows.filter(isProblem).length;
   const overallStatus = problemCount === 0 ? 'READY' : 'NOT_READY';
 
+  const buildItemRows = () => rows.map((it) => {
+    const a = answers[it.id] || {};
+    return {
+      code: it.item_code,
+      name: it.item_name,
+      status: it.has_expiry ? (a.expiry ? medStatus(a.expiry) : null) : (it.numeric_input ? (a.amount ? 'OK' : null) : (a.status || null)),
+      expiryDate: a.expiry || null,
+      amount: a.amount || null,
+      note: a.note || null,
+      photoUrl: a.photoUrl || null,
+    };
+  });
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError('');
@@ -572,21 +586,28 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
       inspectorId: user.id,
       inspectorName: user.name,
       overallStatus,
-      items: rows.map((it) => {
-        const a = answers[it.id] || {};
-        return {
-          code: it.item_code,
-          name: it.item_name,
-          status: it.has_expiry ? medStatus(a.expiry) : (it.numeric_input ? 'OK' : a.status || null),
-          expiryDate: a.expiry || null,
-          amount: a.amount || null,
-          note: a.note || null,
-          photoUrl: a.photoUrl || null,
-        }; 
-      }),
+      items: buildItemRows(),
     });
     setSubmitting(false);
     if (result.error) setSubmitError(result.error); else onDone();
+  };
+
+  // ถ้ากดกลับก่อนตรวจครบทุกรายการ ให้บันทึกฉบับร่างไว้ก่อน (สถานะ "ตรวจไม่ครบ")
+  // เพื่อให้กลับมาตรวจต่อจากเดิมได้ในครั้งหน้า ไม่ต้องเริ่มใหม่และไม่เสียข้อมูลที่กรอกไปแล้ว
+  const handleBack = async () => {
+    if (isReadOnly || rows.length === 0 || !rows.some(isAnswered)) {
+      onBack();
+      return;
+    }
+    await saveInspection({
+      locationCode,
+      moduleKey,
+      inspectorId: user.id,
+      inspectorName: user.name,
+      overallStatus: allAnswered ? overallStatus : 'PARTIAL',
+      items: buildItemRows(),
+    });
+    onBack();
   };
 
   if (loading) {
@@ -608,7 +629,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
 
   return (
     <div className="screen">
-      <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={onBack} />
+      <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={handleBack} />
       <main className="form-body">
         {prefilled && (
           <div className="reminder-banner" style={{ marginBottom: 12 }}>
