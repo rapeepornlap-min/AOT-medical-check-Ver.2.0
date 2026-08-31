@@ -508,7 +508,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
 
   useEffect(() => {
     (async () => {
-      const res = await getChecklistItems(moduleKey);
+      const res = await getChecklistItems(moduleKey, locationCode);
       if (res.error) { setLoadError(res.error); setLoading(false); return; }
       const loadedItems = res.data || [];
       setItems(loadedItems);

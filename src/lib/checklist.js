@@ -17,14 +17,18 @@ export async function getLocationsForRole(role) {
 /**
  * ดึงรายการ checklist ของ module_key หนึ่งๆ เรียงตาม sort_order
  */
-export async function getChecklistItems(moduleKey) {
+export async function getChecklistItems(moduleKey, locationCode) {
   const { data, error } = await supabase
     .from('checklist_templates')
     .select('*')
     .eq('module_key', moduleKey)
     .order('sort_order');
   if (error) return { error: error.message };
-  return { data };
+  // included_location_codes ว่าง/NULL = แสดงทุกจุด, มีค่า = แสดงเฉพาะจุดที่ระบุไว้เท่านั้น
+  const filtered = locationCode
+    ? data.filter((it) => !it.included_location_codes || it.included_location_codes.length === 0 || it.included_location_codes.includes(locationCode))
+    : data;
+  return { data: filtered };
 }
 /**
  * ดึงค่าที่บันทึกไว้ล่าสุดของ location + module หนึ่งๆ (เพื่อนำมา pre-fill ฟอร์ม)
