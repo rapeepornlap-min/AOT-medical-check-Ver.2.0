@@ -28,10 +28,10 @@ function dayOfWeekLabel(year, month, day) {
   return new Date(year, month - 1, day).toLocaleDateString('th-TH', { weekday: 'short' });
 }
 
-export async function generateDailyLogReportPDF(locationCode) {
+export async function generateDailyLogReportPDF(locationCode, year, month) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  year = year || now.getFullYear();
+  month = month || now.getMonth() + 1;
 
   const [res, holidayRes] = await Promise.all([
     getAmbulanceDailyLogCalendar(locationCode, year, month),

@@ -146,10 +146,10 @@ function addFootnotes(doc, now) {
   }
 }
 
-export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel) {
+export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel, year, month) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  year = year || now.getFullYear();
+  month = month || now.getMonth() + 1;
 
   const [res, holidayRes] = await Promise.all([
     getItemCalendarData(locationCode, moduleKey, year, month),
@@ -176,10 +176,10 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
  * รายงานตารางรายเดือนแบบรวมทุกกระเป๋า/ชุดของจุดเดียว เป็นไฟล์เดียว (แต่ละชุดขึ้นหน้าใหม่แยกกัน)
  * moduleGroups: [{ moduleKey, label }] ตามที่ตั้งค่าไว้ใน LOCATION_MODULE_GROUPS ของจุดนั้น
  */
-export async function generateLocationCalendarPDF(locationCode, locationLabel, moduleGroups) {
+export async function generateLocationCalendarPDF(locationCode, locationLabel, moduleGroups, year, month) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  year = year || now.getFullYear();
+  month = month || now.getMonth() + 1;
 
   const holidayRes = await getPublicHolidays(year, month);
   const holidayDays = new Set(holidayRes.data || []);

@@ -286,7 +286,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
                     const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
                       (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role)
                     );
-                    generateLocationCalendarPDF(loc.code, loc.label, groups);
+                    requestMonthlyReport(`รายงานตารางรายเดือน — ${loc.label}`, (year, month) => generateLocationCalendarPDF(loc.code, loc.label, groups, year, month));
                   }}
                 >
                   📊 รายงานตารางรายเดือน (รวมทุกชุด)
@@ -376,7 +376,7 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
               <button
                 type="button"
                 className="menu-card-report-btn"
-                onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label); }}
+                onClick={(e) => { e.stopPropagation(); requestMonthlyReport(`รายงานตารางรายเดือน — ${vehicle.label} · ${m.label}`, (year, month) => generateItemCalendarPDF(vehicle.code, m.moduleKey, m.label, year, month)); }}
               >
                 📊 รายงานตารางรายเดือน
               </button>
@@ -385,7 +385,7 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
               <button
                 type="button"
                 className="menu-card-report-btn"
-                onClick={(e) => { e.stopPropagation(); generateDailyLogReportPDF(vehicle.code); }}
+                onClick={(e) => { e.stopPropagation(); requestMonthlyReport(`รายงานบันทึกประจำวัน — ${vehicle.label}`, (year, month) => generateDailyLogReportPDF(vehicle.code, year, month)); }}
               >
                 📊 รายงานตารางรายเดือน
               </button>
@@ -1371,7 +1371,7 @@ function DashboardScreen({ user, onBack }) {
               <ExpiringAlertsList items={expiring} />
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => requestMonthlyReport('ปฏิทินการตรวจ', (year, month) => generateComplianceCalendarPDF(year, month))}>🗓️ ปฏิทินการตรวจ</button>
                 <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateProblemSummaryReportPDF()}>⚠️ สรุปรายการที่มีปัญหา</button>
               </div>
             </>
@@ -1594,6 +1594,70 @@ function GenericWorkspace({ category, user, onExit }) {
 }
 
 // -------------------------------------------------------------------------
+// ตัวเลือกเดือน/ปีก่อนออกรายงานตารางรายเดือน (เพื่อดูรายงานย้อนหลังได้)
+// -------------------------------------------------------------------------
+const THAI_MONTH_NAMES = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
+
+/**
+ * เรียกใช้แทนการยิงฟังก์ชันสร้างรายงานตรงๆ — จะเด้งให้เลือกเดือน/ปีก่อนเสมอ
+ * onGenerate: (year, month) => void — ฟังก์ชันสร้างรายงานจริง เรียกพร้อมปี ค.ศ. และเดือน (1-12) ที่เลือก
+ */
+function requestMonthlyReport(title, onGenerate) {
+  window.dispatchEvent(new CustomEvent('aot-pick-month', { detail: { title, onGenerate } }));
+}
+
+function MonthPickerModal({ request, onClose }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  useEffect(() => {
+    if (request) { setYear(now.getFullYear()); setMonth(now.getMonth() + 1); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  if (!request) return null;
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+
+  return (
+    <div className="pdf-modal-overlay" onClick={onClose}>
+      <div className="month-picker-box" onClick={(e) => e.stopPropagation()}>
+        <div className="pdf-modal-header">
+          <span className="pdf-modal-title">{request.title}</span>
+          <button type="button" className="pdf-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        </div>
+        <div className="month-picker-body">
+          <label className="field-label">เลือกเดือน/ปีที่ต้องการดูรายงาน</label>
+          <div className="month-picker-selects">
+            <select className="filter-select" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+              {THAI_MONTH_NAMES.map((m, i) => (
+                <option key={i} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <select className="filter-select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {years.map((y) => (
+                <option key={y} value={y}>{y + 543}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ marginTop: 18 }}
+            onClick={() => { request.onGenerate(year, month); onClose(); }}
+          >
+            ดูรายงาน
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
 // ตัวแสดง PDF ในหน้าเดิม (แทนการเปิดแท็บ/หน้าต่างใหม่ ซึ่งใช้ไม่ได้ใน in-app browser หลายตัว)
 // -------------------------------------------------------------------------
 function PdfViewerModal({ pdf, onClose }) {
@@ -1624,11 +1688,18 @@ export default function App() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPendingAck, setShowPendingAck] = useState(false);
   const [pdfModal, setPdfModal] = useState(null);
+  const [monthPickerRequest, setMonthPickerRequest] = useState(null);
 
   useEffect(() => {
     const handler = (e) => setPdfModal(e.detail);
     window.addEventListener('aot-show-pdf', handler);
     return () => window.removeEventListener('aot-show-pdf', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => setMonthPickerRequest(e.detail);
+    window.addEventListener('aot-pick-month', handler);
+    return () => window.removeEventListener('aot-pick-month', handler);
   }, []);
 
   const handleLogout = async () => {
@@ -1660,6 +1731,7 @@ export default function App() {
     <>
       {screen}
       <PdfViewerModal pdf={pdfModal} onClose={() => setPdfModal(null)} />
+      <MonthPickerModal request={monthPickerRequest} onClose={() => setMonthPickerRequest(null)} />
     </>
   );
 }

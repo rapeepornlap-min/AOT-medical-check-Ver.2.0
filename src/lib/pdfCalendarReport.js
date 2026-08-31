@@ -30,10 +30,10 @@ function buildGrid(rows, columnKey) {
   return { vehicles, columns, map };
 }
 
-export async function generateComplianceCalendarPDF() {
+export async function generateComplianceCalendarPDF(year, month) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  year = year || now.getFullYear();
+  month = month || now.getMonth() + 1;
 
   const [dailyRes, weeklyRes] = await Promise.all([
     getDailyCalendar(year, month),
