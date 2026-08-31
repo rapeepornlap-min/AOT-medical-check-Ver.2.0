@@ -25,33 +25,12 @@ function monthLabel(year, month) {
   return new Date(year, month - 1, 1).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
 }
 
-export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-
-  const [res, holidayRes] = await Promise.all([
-    getItemCalendarData(locationCode, moduleKey, year, month),
-    getPublicHolidays(year, month),
-  ]);
-  if (res.error) {
-    alert('ดึงข้อมูลไม่สำเร็จ: ' + res.error);
-    return;
-  }
-  const { locationLabel, items, statusMap } = res.data;
-  const holidayDays = new Set(holidayRes.data || []);
-
+/**
+ * วาดตารางเช็คลิสต์ 1 ชุด (1 โมดูล/กระเป๋า) ลงในหน้าปัจจุบันของ doc
+ * ใช้ร่วมกันทั้งรายงานแบบทีละชุด (generateItemCalendarPDF) และแบบรวมทุกชุด (generateLocationCalendarPDF)
+ */
+function drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap }) {
   const daysInMonth = new Date(year, month, 0).getDate();
-  const weekendDays = new Set();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dow = new Date(year, month - 1, d).getDay();
-    if (dow === 0 || dow === 6) weekendDays.add(d);
-  }
-  // วันหยุด = เสาร์-อาทิตย์ หรือวันหยุดนักขัตฤกษ์ — เว้นจากการเติมเครื่องหมายถูกอัตโนมัติของทั้งสัปดาห์
-  const nonWorkDays = new Set([...weekendDays, ...holidayDays]);
-
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-  registerThaiFont(doc);
 
   doc.setFontSize(14);
   doc.setFont('Sarabun', 'bold');
@@ -73,9 +52,16 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     dayToWeek[d] = weekIdx;
   }
 
+  const weekendDays = new Set();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month - 1, d).getDay();
+    if (dow === 0 || dow === 6) weekendDays.add(d);
+  }
+  // วันหยุด = เสาร์-อาทิตย์ หรือวันหยุดนักขัตฤกษ์ — เว้นจากการเติมเครื่องหมายถูกอัตโนมัติของทั้งสัปดาห์
+  const holidayDays = drawModuleSection._holidayDays || new Set();
+  const nonWorkDays = new Set([...weekendDays, ...holidayDays]);
+
   const body = items.map((it, idx) => {
-    // ถ้าสัปดาห์ไหนมีการติ๊ก OK หรือใกล้หมดอายุ ในวันทำงานอย่างน้อย 1 วัน ให้ถือว่าทั้งสัปดาห์นั้น (เฉพาะวันทำงาน) ตรวจครบ
-    // เว้นเสาร์-อาทิตย์และวันหยุดนักขัตฤกษ์ไว้เสมอ ไม่เติมเครื่องหมายถูกอัตโนมัติให้
     const okWeeks = new Set();
     const nearWeeks = new Set();
     for (let d = 1; d <= daysInMonth; d++) {
@@ -97,7 +83,6 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
           if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
           return '-';
         }
-        // ใกล้หมดอายุ มีสิทธิ์เหนือกว่า: ถ้าสัปดาห์นี้มีวันที่ใกล้หมดอายุ ให้ติ๊กเตือนสีส้มครบทั้งสัปดาห์
         if (nearWeeks.has(dayToWeek[day])) return 'NEAR';
         if (status === 'OK' || okWeeks.has(dayToWeek[day])) return 'OK';
         if (status === 'NOT_OK' || status === 'EXPIRED') return 'X';
@@ -142,7 +127,9 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
       }
     },
   });
+}
 
+function addFootnotes(doc, now) {
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -150,8 +137,69 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     doc.setFontSize(8);
     doc.setTextColor('#9AA5B5');
     doc.text('เครื่องหมาย "-" หมายถึงวันหยุด (เสาร์-อาทิตย์/วันนักขัตฤกษ์) · เครื่องหมายถูกสีส้ม หมายถึงใกล้หมดอายุ — ติ๊ก 1 วันในสัปดาห์ถือว่าครบทั้งสัปดาห์ (เฉพาะวันทำงาน)', 8, 200);
-    doc.text(`จัดทำโดยระบบ AOT Medical Check · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 8, 205);
+    doc.text(`จัดทำโดยระบบ AOT Medical Readiness System · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')} · หน้า ${i}/${pageCount}`, 8, 205);
   }
+}
+
+export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLabel) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const [res, holidayRes] = await Promise.all([
+    getItemCalendarData(locationCode, moduleKey, year, month),
+    getPublicHolidays(year, month),
+  ]);
+  if (res.error) {
+    alert('ดึงข้อมูลไม่สำเร็จ: ' + res.error);
+    return;
+  }
+  const { locationLabel, items, statusMap } = res.data;
+  const holidayDays = new Set(holidayRes.data || []);
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+  registerThaiFont(doc);
+
+  drawModuleSection._holidayDays = holidayDays;
+  drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap });
+  addFootnotes(doc, now);
 
   await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
+}
+
+/**
+ * รายงานตารางรายเดือนแบบรวมทุกกระเป๋า/ชุดของจุดเดียว เป็นไฟล์เดียว (แต่ละชุดขึ้นหน้าใหม่แยกกัน)
+ * moduleGroups: [{ moduleKey, label }] ตามที่ตั้งค่าไว้ใน LOCATION_MODULE_GROUPS ของจุดนั้น
+ */
+export async function generateLocationCalendarPDF(locationCode, locationLabel, moduleGroups) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const holidayRes = await getPublicHolidays(year, month);
+  const holidayDays = new Set(holidayRes.data || []);
+  drawModuleSection._holidayDays = holidayDays;
+
+  const results = await Promise.all(
+    moduleGroups.map((g) => getItemCalendarData(locationCode, g.moduleKey, year, month))
+  );
+
+  const failed = results.find((r) => r.error);
+  if (failed) {
+    alert('ดึงข้อมูลไม่สำเร็จ: ' + failed.error);
+    return;
+  }
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+  registerThaiFont(doc);
+
+  moduleGroups.forEach((g, idx) => {
+    if (idx > 0) doc.addPage();
+    const { items, statusMap } = results[idx].data;
+    drawModuleSection(doc, { year, month, locationLabel, moduleLabel: g.label, items, statusMap });
+  });
+
+  addFootnotes(doc, now);
+
+  await sharePDF(doc, `Checklist_${locationLabel}_รวมทุกชุด_${monthLabel(year, month).replace(' ', '_')}.pdf`);
 }

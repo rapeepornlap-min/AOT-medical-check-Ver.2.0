@@ -4,7 +4,7 @@ import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getOverallReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
-import { generateItemCalendarPDF } from './lib/pdfItemCalendarReport';
+import { generateItemCalendarPDF, generateLocationCalendarPDF } from './lib/pdfItemCalendarReport';
 import { generateDailyLogReportPDF } from './lib/pdfDailyLogReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
@@ -277,6 +277,21 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
               <div className="menu-card-status">
                 <span className={`dash-pill ${pillClass}`}>{pillLabel}</span>
               </div>
+              {!isAmbulance && (
+                <button
+                  type="button"
+                  className="menu-card-report-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
+                      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role)
+                    );
+                    generateLocationCalendarPDF(loc.code, loc.label, groups);
+                  }}
+                >
+                  📊 รายงานตารางรายเดือน (รวมทุกชุด)
+                </button>
+              )}
             </button>
           );
         })}
@@ -335,13 +350,6 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             <div className="menu-card-status">
               <span className={`dash-pill ${checkedPillClass}`}>{checkedPillLabel}</span>
             </div>
-            <button
-              type="button"
-              className="menu-card-report-btn"
-              onClick={(e) => { e.stopPropagation(); generateItemCalendarPDF(location.code, g.moduleKey, g.label); }}
-            >
-              📊 รายงานตารางรายเดือน
-            </button>
         </button>
           );
         })}
