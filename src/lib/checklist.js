@@ -301,6 +301,16 @@ export async function getPublicHolidays(year, month) {
 }
 
 /**
+ * ดึงรายการยา/เวชภัณฑ์/อุปกรณ์ที่มีปัญหาทั้งหมด (ใกล้หมดอายุ, หมดอายุ, ไม่ครบ) จากการตรวจล่าสุดของทุกจุด
+ * ใช้สำหรับรายงานสรุปภาพรวมปัญหาแยกตาม station
+ */
+export async function getAllProblemItems() {
+  const { data, error } = await supabase.rpc('get_all_problem_items');
+  if (error) return { error: error.message };
+  return { data: data || [] };
+}
+
+/**
  * ดึงข้อมูล "บันทึกประจำวัน" (ambulance_daily) ทั้งเดือนของคันรถหนึ่งๆ สำหรับรายงานตารางรายเดือน
  * คืนค่าเป็น { locationLabel, entries: [{day, inspector_name, mileage, fuel_level, note, overall_status}] }
  */

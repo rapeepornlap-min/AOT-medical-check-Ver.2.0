@@ -9,6 +9,7 @@ import { generateDailyLogReportPDF } from './lib/pdfDailyLogReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
+import { generateProblemSummaryReportPDF } from './lib/pdfProblemSummaryReport';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -1363,6 +1364,7 @@ function DashboardScreen({ user, onBack }) {
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
                 <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateComplianceCalendarPDF()}>🗓️ ปฏิทินการตรวจ</button>
+                <button className="dash-pdf-btn dash-pdf-btn-outline" onClick={() => generateProblemSummaryReportPDF()}>⚠️ สรุปรายการที่มีปัญหา</button>
               </div>
             </>
           )}
