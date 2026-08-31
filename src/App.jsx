@@ -4,7 +4,7 @@ import { loginWithUsername, logout, changePassword } from './lib/auth';
 import { saveInspection } from './lib/inspections';
 import { getLocationsForRole, getChecklistItems, getModuleItemCounts, getExpiringItems, getReadinessByPeriod, getNotReadyByPeriod, getAmbulanceCompliance, getLocationsWithResponsible, getLatestStatusByLocation, getAmbulanceDailyLoggedToday, getTodayDailyLog, getPendingAcknowledgments, acknowledgeInspection, getAcknowledgmentSummary, getLatestInspectionAnswers, getInspectionProblemItems, getCategoryLocationSummary, getCategoryReadinessTrend, getOverallReadinessTrend, getCategoryTopProblems, getCategoryModuleBreakdown } from './lib/checklist';
 import { supabase } from './lib/supabaseClient';
-import { generateItemCalendarPDF, generateLocationCalendarPDF } from './lib/pdfItemCalendarReport';
+import { generateItemCalendarPDF, generateLocationCalendarPDF, generateQuarterlySummaryPDF } from './lib/pdfItemCalendarReport';
 import { generateDailyLogReportPDF } from './lib/pdfDailyLogReport';
 import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
@@ -325,6 +325,18 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
   return (
     <div className="screen">
       <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
+      {location.code === 'aircraft_bag' && (
+        <div style={{ padding: '16px 24px 0', maxWidth: 640, margin: '0 auto', width: '100%' }}>
+          <button
+            type="button"
+            className="dash-pdf-btn"
+            style={{ width: '100%' }}
+            onClick={() => generateQuarterlySummaryPDF(location.code, location.label, groups)}
+          >
+            📊 รายงานสรุปรายไตรมาส
+          </button>
+        </div>
+      )}
       <main className="menu-grid">
         {groups.map((g) => {
           const tintClass = g.accent === '#1D9A63' ? 'menu-card-green'

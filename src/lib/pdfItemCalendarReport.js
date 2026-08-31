@@ -208,3 +208,128 @@ export async function generateLocationCalendarPDF(locationCode, locationLabel, m
 
   await sharePDF(doc, `Checklist_${locationLabel}_รวมทุกชุด_${monthLabel(year, month).replace(' ', '_')}.pdf`);
 }
+
+const QUARTER_LABELS = { 10: 'ไตรมาส 1', 1: 'ไตรมาส 2', 4: 'ไตรมาส 3', 7: 'ไตรมาส 4' };
+const STATUS_LABELS_TH = { OK: 'ครบ', NOT_OK: 'ไม่ครบ', NEAR: 'ใกล้หมดอายุ', EXPIRED: 'หมดอายุ' };
+const STATUS_COLORS_TH = { OK, NOT_OK: BAD, NEAR: WARN, EXPIRED: BAD };
+
+function currentQuarterMonths(now) {
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const nowBkk = new Date(now.getTime() + BKK_OFFSET_MS);
+  const month = nowBkk.getUTCMonth() + 1;
+  const year = nowBkk.getUTCFullYear();
+  let qStartMonth;
+  if (month >= 10) qStartMonth = 10;
+  else if (month >= 7) qStartMonth = 7;
+  else if (month >= 4) qStartMonth = 4;
+  else qStartMonth = 1;
+  return { qStartMonth, months: [qStartMonth, qStartMonth + 1, qStartMonth + 2].map((m) => ({ year, month: m })) };
+}
+
+/**
+ * รายงานสรุปรายไตรมาส — ตารางสรุป (ไม่ใช่ตารางรายวันแบบเดือน) แสดงสถานะ/วันที่ตรวจล่าสุดของแต่ละรายการ
+ * ในไตรมาสปัจจุบัน (3 เดือน) เหมาะกับจุดที่ตรวจแบบไตรมาสละครั้ง เช่น กระเป๋า บ.ฉุกเฉิน
+ */
+export async function generateQuarterlySummaryPDF(locationCode, locationLabel, moduleGroups) {
+  const now = new Date();
+  const { qStartMonth, months } = currentQuarterMonths(now);
+
+  const holidayResults = await Promise.all(months.map((m) => getPublicHolidays(m.year, m.month)));
+  const holidayDays = new Set(holidayResults.flatMap((r) => r.data || []));
+
+  const dataByModule = await Promise.all(
+    moduleGroups.map((g) => Promise.all(months.map((m) => getItemCalendarData(locationCode, g.moduleKey, m.year, m.month))))
+  );
+
+  const failed = dataByModule.flat().find((r) => r.error);
+  if (failed) {
+    alert('ดึงข้อมูลไม่สำเร็จ: ' + failed.error);
+    return;
+  }
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  registerThaiFont(doc);
+
+  const quarterLabel = `${QUARTER_LABELS[qStartMonth]} (${monthLabel(months[0].year, months[0].month)} – ${monthLabel(months[2].year, months[2].month)})`;
+
+  doc.setFontSize(16);
+  doc.setFont('Sarabun', 'bold');
+  doc.setTextColor(NAVY);
+  doc.text(`รายงานสรุปรายไตรมาส — ${locationLabel}`, 14, 16);
+  doc.setFontSize(10);
+  doc.setFont('Sarabun', 'normal');
+  doc.setTextColor('#6B7686');
+  doc.text(quarterLabel, 14, 22);
+  doc.setDrawColor(NAVY);
+  doc.setLineWidth(0.6);
+  doc.line(14, 26, 196, 26);
+
+  let y = 34;
+  moduleGroups.forEach((g, gIdx) => {
+    const monthDatas = months.map((m, i) => ({ ...m, ...dataByModule[gIdx][i].data }));
+    const items = monthDatas[0].items;
+
+    const rows = items.map((it) => {
+      let best = null;
+      monthDatas.forEach(({ year, month, statusMap, amountMap }) => {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const s = statusMap[`${it.item_id}-${d}`];
+          if (!s) continue;
+          const dateVal = new Date(year, month - 1, d);
+          if (!best || dateVal > best.dateVal) {
+            best = { dateVal, status: s, amount: amountMap && amountMap[`${it.item_id}-${d}`], day: d, month, year };
+          }
+        }
+      });
+      return { it, best };
+    });
+
+    if (y > 265) { doc.addPage(); y = 20; }
+    doc.setFillColor(NAVY);
+    doc.rect(14, y, 182, 8, 'F');
+    doc.setFont('Sarabun', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor('#FFFFFF');
+    const checkedCount = rows.filter((r) => r.best).length;
+    doc.text(`${g.label}  (ตรวจแล้ว ${checkedCount}/${rows.length} รายการ)`, 17, y + 5.8);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['รายการ', 'จำนวน/มาตรฐาน', 'สถานะในไตรมาสนี้', 'วันที่ตรวจล่าสุด']],
+      body: rows.map(({ it, best }) => {
+        let statusText;
+        if (!best) statusText = 'ยังไม่ตรวจ';
+        else if (it.numeric_input) statusText = best.amount ? `${best.amount}${it.unit ? ' ' + it.unit : ''}` : (STATUS_LABELS_TH[best.status] || best.status);
+        else statusText = STATUS_LABELS_TH[best.status] || best.status;
+        const dateText = best ? `${String(best.day).padStart(2, '0')}/${String(best.month).padStart(2, '0')}/${best.year}` : '-';
+        return [it.item_name, it.standard_qty || '', statusText, dateText];
+      }),
+      styles: { font: 'Sarabun', fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: '#E3E8EF', textColor: NAVY, font: 'Sarabun', fontStyle: 'bold', fontSize: 9 },
+      columnStyles: { 0: { cellWidth: 66 }, 1: { cellWidth: 34 }, 2: { cellWidth: 42 }, 3: { cellWidth: 34 } },
+      margin: { left: 14, right: 14 },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 2) {
+          const { best } = rows[data.row.index];
+          if (!best) data.cell.styles.textColor = '#9AA5B5';
+          else if (!rows[data.row.index].it.numeric_input) data.cell.styles.textColor = STATUS_COLORS_TH[best.status] || '#1F2937';
+        }
+      },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont('Sarabun', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor('#9AA5B5');
+    doc.text('รายงานนี้สรุปสถานะการตรวจล่าสุดของแต่ละรายการภายในไตรมาสปัจจุบัน (ไม่ใช่ตารางรายวัน)', 14, 283);
+    doc.text(`จัดทำโดยระบบ AOT Medical Readiness System · พิมพ์เมื่อ ${now.toLocaleDateString('th-TH')}`, 14, 288);
+  }
+
+  await sharePDF(doc, `รายงานสรุปรายไตรมาส_${locationLabel}_${QUARTER_LABELS[qStartMonth].replace(' ', '')}_${months[0].year}.pdf`);
+}
