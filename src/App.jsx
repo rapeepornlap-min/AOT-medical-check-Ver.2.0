@@ -192,7 +192,7 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
             <div className="menu-card-subtitle">{cat.meta.subtitle}</div>
           </button>
         ))}
-        {!loading && !loadError && user.role === 'ADMIN' && (
+        {!loading && !loadError && (user.role === 'ADMIN' || user.role === 'VISITOR') && (
           <button className="menu-card" onClick={onOpenDashboard}>
             <div className="menu-card-dot" />
             <div className="menu-card-num">รายการที่ 5</div>
@@ -238,7 +238,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
   const expectedKeysFor = (loc) => {
     if (isAmbulance) return AMBULANCE_MODULES.filter((m) => m.moduleKey).map((m) => m.moduleKey);
     const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
-      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role)
+      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role) || user?.role === 'VISITOR'
     );
     return groups.map((g) => g.moduleKey).filter(Boolean);
   };
@@ -285,7 +285,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
                   onClick={(e) => {
                     e.stopPropagation();
                     const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
-                      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role)
+                      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role) || user?.role === 'VISITOR'
                     );
                     requestMonthlyReport(`รายงานตารางรายเดือน — ${loc.label}`, (year, month) => generateLocationCalendarPDF(loc.code, loc.label, groups, year, month));
                   }}
@@ -306,7 +306,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
 // -------------------------------------------------------------------------
 function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
   const groups = (LOCATION_MODULE_GROUPS[location.code] || []).filter(
-    (g) => !g.allowedRoles || g.allowedRoles.includes(user.role)
+    (g) => !g.allowedRoles || g.allowedRoles.includes(user.role) || user.role === 'VISITOR'
   );
   const [counts, setCounts] = useState({});
   const [moduleStatus, setModuleStatus] = useState({});
@@ -400,7 +400,8 @@ function ModuleMenu({ vehicle, onSelectModule, onBack }) {
 
 // ---------- โมดูล: บันทึกประจำวัน (ฟอร์มธรรมดา ไม่ใช้ checklist_templates) ----------
 function DailyLogModule({ vehicle, user, onBack, onSaved }) {
-  const isReadOnly = user.role === 'ADMIN';
+  const isAdmin = user.role === 'ADMIN';
+  const isVisitor = user.role === 'VISITOR';
   const [mileage, setMileage] = useState('');
   const [fuel, setFuel] = useState('F');
   const [note, setNote] = useState('');
@@ -428,6 +429,11 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
     if (!mileage.trim()) { setError('กรุณากรอกเลขไมล์'); return; }
     setSaving(true);
     setError('');
+    if (isVisitor) {
+      // โหมดทดลองสำหรับผู้เยี่ยมชม — จำลองการบันทึกให้ แต่ไม่เขียนข้อมูลลงฐานข้อมูลจริง
+      setTimeout(() => { setSaving(false); onSaved(); }, 400);
+      return;
+    }
     const result = await saveInspection({
       locationCode: vehicle.code,
       moduleKey: 'ambulance_daily',
@@ -446,7 +452,12 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
   return (
     <div className="screen">
       <TopBar title="บันทึกประจำวัน" sub={`${vehicle.label} · ${formatThaiDateTime(new Date())}`} onBack={onBack} />
-      <main className="form-body">
+      <main className="form-body" style={isAdmin ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
+        {isVisitor && (
+          <div className="reminder-banner" style={{ marginBottom: 12 }}>
+            🧪 โหมดทดลองสำหรับผู้เยี่ยมชม — กรอก/กดได้ตามปกติ แต่ระบบจะไม่บันทึกข้อมูลนี้ลงฐานข้อมูลจริง
+          </div>
+        )}
         {alreadyLoggedToday && (
           <div className="reminder-banner" style={{ marginBottom: 12 }}>
             ✅ วันนี้บันทึกไปแล้ว — ข้อมูลด้านล่างคือค่าที่บันทึกล่าสุด แก้ไขแล้วกดบันทึกซ้ำได้ถ้าต้องการอัปเดต
@@ -471,9 +482,13 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
         <div className="checklist-standard" style={{ marginTop: 16 }}>ผู้บันทึก: {user.name}</div>
 
         {error && <div className="form-error">{error}</div>}
-        <button className="btn-primary" style={{ marginTop: 16 }} disabled={saving} onClick={handleSave}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกการตรวจสอบวันนี้'}
-        </button>
+        {isAdmin ? (
+          <div className="empty-state">👁 โหมดดูอย่างเดียว (Admin) — ไม่สามารถบันทึกหรือแก้ไขข้อมูลได้</div>
+        ) : (
+          <button className="btn-primary" style={{ marginTop: 16 }} disabled={saving} onClick={handleSave}>
+            {saving ? 'กำลังบันทึก...' : isVisitor ? 'ลองบันทึก (โหมดทดลอง)' : 'บันทึกการตรวจสอบวันนี้'}
+          </button>
+        )}
       </main>
     </div>
   );
@@ -486,7 +501,9 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
 // -------------------------------------------------------------------------
 const ACCENT_BG = { '#1D9A63': '#EAF7F0', '#B8760A': '#FDF3E3', '#D64545': '#FBEAEA' };
 function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBack, onDone, accentColor }) {
-  const isReadOnly = user.role === 'ADMIN';
+  const isAdmin = user.role === 'ADMIN';
+  const isVisitor = user.role === 'VISITOR';
+  const isReadOnly = isAdmin || isVisitor;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -499,6 +516,11 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
 
   const handlePhotoSelect = async (it, file) => {
     if (!file) return;
+    if (isVisitor) {
+      // โหมดทดลอง — โชว์ preview จากไฟล์ในเครื่องผู้ใช้เอง ไม่อัปโหลดขึ้น Storage จริง
+      setAnswer(it.id, { photoUrl: URL.createObjectURL(file) });
+      return;
+    }
     setUploadingId(it.id);
     const ext = file.name.split('.').pop() || 'jpg';
     const path = `${locationCode}/${moduleKey}/${it.id}-${Date.now()}.${ext}`;
@@ -580,6 +602,11 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError('');
+    if (isVisitor) {
+      // โหมดทดลองสำหรับผู้เยี่ยมชม — จำลองการบันทึกให้ แต่ไม่เขียนข้อมูลลงฐานข้อมูลจริง
+      setTimeout(() => { setSubmitting(false); onDone(); }, 400);
+      return;
+    }
     const result = await saveInspection({
       locationCode,
       moduleKey,
@@ -631,12 +658,17 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
     <div className="screen">
       <TopBar title={moduleLabel} sub={`${formatThaiDateTime(new Date())} · ${rows.length} รายการ`} onBack={handleBack} />
       <main className="form-body">
+        {isVisitor && (
+          <div className="reminder-banner" style={{ marginBottom: 12 }}>
+            🧪 โหมดทดลองสำหรับผู้เยี่ยมชม — กรอก/กดได้ตามปกติ แต่ระบบจะไม่บันทึกข้อมูลนี้ลงฐานข้อมูลจริง
+          </div>
+        )}
         {prefilled && (
           <div className="reminder-banner" style={{ marginBottom: 12 }}>
             🔄 แสดงข้อมูลจากการตรวจครั้งล่าสุด กรุณาตรวจสอบและแก้ไขให้ตรงกับสภาพจริงก่อนบันทึก
           </div>
         )}
-        <div className="checklist" style={isReadOnly ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
+        <div className="checklist" style={isAdmin ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
           {items.map((it) => {
             if (it.is_header) {
               return <div className="checklist-header" key={it.id}>{it.item_name}</div>;
@@ -750,13 +782,13 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
               </span>
             </div>
             <div className="checklist-standard" style={{ marginBottom: 10 }}>ผู้บันทึก: {user.name}</div>
-            {isReadOnly ? (
+            {isAdmin ? (
               <div className="empty-state">👁 โหมดดูอย่างเดียว (Admin) — ไม่สามารถบันทึกหรือแก้ไขข้อมูลได้</div>
             ) : (
               <>
                 {submitError && <div className="form-error">{submitError}</div>}
                 <button className="btn-primary" disabled={!allAnswered || submitting} onClick={handleSubmit}>
-                  {submitting ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบ'}
+                  {submitting ? 'กำลังบันทึก...' : isVisitor ? 'ลองบันทึกผลการตรวจสอบ (โหมดทดลอง)' : 'บันทึกผลการตรวจสอบ'}
                 </button>
               </>
             )}

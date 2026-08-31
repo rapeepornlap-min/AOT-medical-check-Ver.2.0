@@ -11,6 +11,7 @@ export const ROLES = {
   PN: { key: 'PN', label: 'ผู้ช่วยพยาบาล (PN)' },
   PHARMACIST: { key: 'PHARMACIST', label: 'เภสัชกร (Pharmacist)' },
   ADMIN: { key: 'ADMIN', label: 'ผู้ดูแลระบบ (Admin)' },
+  VISITOR: { key: 'VISITOR', label: 'ผู้เยี่ยมชม (Visitor)' },
 };
 
 // รถพยาบาล: โมดูลย่อยคงที่ 4 อย่าง (daily ไม่ผูก module_key เพราะเป็นฟอร์มธรรมดา)
