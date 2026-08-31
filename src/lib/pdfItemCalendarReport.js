@@ -271,14 +271,19 @@ export async function generateQuarterlySummaryPDF(locationCode, locationLabel, m
 
     const rows = items.map((it) => {
       let best = null;
-      monthDatas.forEach(({ year, month, statusMap, amountMap }) => {
+      monthDatas.forEach(({ year, month, statusMap, amountMap, expiryMap }) => {
         const daysInMonth = new Date(year, month, 0).getDate();
         for (let d = 1; d <= daysInMonth; d++) {
           const s = statusMap[`${it.item_id}-${d}`];
           if (!s) continue;
           const dateVal = new Date(year, month - 1, d);
           if (!best || dateVal > best.dateVal) {
-            best = { dateVal, status: s, amount: amountMap && amountMap[`${it.item_id}-${d}`], day: d, month, year };
+            best = {
+              dateVal, status: s,
+              amount: amountMap && amountMap[`${it.item_id}-${d}`],
+              expiry: expiryMap && expiryMap[`${it.item_id}-${d}`],
+              day: d, month, year,
+            };
           }
         }
       });
@@ -297,24 +302,31 @@ export async function generateQuarterlySummaryPDF(locationCode, locationLabel, m
 
     autoTable(doc, {
       startY: y,
-      head: [['รายการ', 'จำนวน/มาตรฐาน', 'สถานะในไตรมาสนี้', 'วันที่ตรวจล่าสุด']],
+      head: [['รายการ', 'มาตรฐาน', 'นับได้จริง', 'วันหมดอายุ', 'สถานะ', 'วันที่ตรวจล่าสุด']],
       body: rows.map(({ it, best }) => {
-        let statusText;
-        if (!best) statusText = 'ยังไม่ตรวจ';
-        else if (it.numeric_input) statusText = best.amount ? `${best.amount}${it.unit ? ' ' + it.unit : ''}` : (STATUS_LABELS_TH[best.status] || best.status);
-        else statusText = STATUS_LABELS_TH[best.status] || best.status;
+        const standardText = it.standard_qty ? `${it.standard_qty}${it.unit ? ' ' + it.unit : ''}` : '-';
+        const countedText = best && best.amount ? `${best.amount}${it.unit ? ' ' + it.unit : ''}` : '-';
+        const expiryText = best && best.expiry ? best.expiry : (it.has_expiry ? '-' : '—');
+        const statusText = !best ? 'ยังไม่ตรวจ' : (STATUS_LABELS_TH[best.status] || best.status);
         const dateText = best ? `${String(best.day).padStart(2, '0')}/${String(best.month).padStart(2, '0')}/${best.year}` : '-';
-        return [it.item_name, it.standard_qty || '', statusText, dateText];
+        return [it.item_name, standardText, countedText, expiryText, statusText, dateText];
       }),
-      styles: { font: 'Sarabun', fontSize: 9, cellPadding: 2.5 },
-      headStyles: { fillColor: '#E3E8EF', textColor: NAVY, font: 'Sarabun', fontStyle: 'bold', fontSize: 9 },
-      columnStyles: { 0: { cellWidth: 66 }, 1: { cellWidth: 34 }, 2: { cellWidth: 42 }, 3: { cellWidth: 34 } },
+      styles: { font: 'Sarabun', fontSize: 8.5, cellPadding: 2.2 },
+      headStyles: { fillColor: '#E3E8EF', textColor: NAVY, font: 'Sarabun', fontStyle: 'bold', fontSize: 8.5 },
+      columnStyles: {
+        0: { cellWidth: 46 },
+        1: { cellWidth: 26, halign: 'center' },
+        2: { cellWidth: 26, halign: 'center' },
+        3: { cellWidth: 26, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center' },
+        5: { cellWidth: 28, halign: 'center' },
+      },
       margin: { left: 14, right: 14 },
       didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 2) {
+        if (data.section === 'body' && data.column.index === 4) {
           const { best } = rows[data.row.index];
           if (!best) data.cell.styles.textColor = '#9AA5B5';
-          else if (!rows[data.row.index].it.numeric_input) data.cell.styles.textColor = STATUS_COLORS_TH[best.status] || '#1F2937';
+          else data.cell.styles.textColor = STATUS_COLORS_TH[best.status] || '#1F2937';
         }
       },
     });

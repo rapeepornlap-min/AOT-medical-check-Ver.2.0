@@ -395,6 +395,7 @@ export async function getItemCalendarData(locationCode, moduleKey, year, month) 
   const itemsMap = {};
   const statusMap = {};
   const amountMap = {};
+  const expiryMap = {};
   data.forEach((row) => {
     if (!itemsMap[row.item_id]) {
       itemsMap[row.item_id] = {
@@ -404,16 +405,18 @@ export async function getItemCalendarData(locationCode, moduleKey, year, month) 
         sort_order: row.sort_order,
         numeric_input: row.numeric_input,
         unit: row.unit,
+        has_expiry: row.has_expiry,
       };
     }
     if (row.day) {
       statusMap[`${row.item_id}-${row.day}`] = row.status;
       if (row.amount) amountMap[`${row.item_id}-${row.day}`] = row.amount;
+      if (row.expiry_date) expiryMap[`${row.item_id}-${row.day}`] = row.expiry_date;
     }
   });
   const items = Object.values(itemsMap).sort((a, b) => a.sort_order - b.sort_order);
 
-  return { data: { locationLabel: location.label, items, statusMap, amountMap } };
+  return { data: { locationLabel: location.label, items, statusMap, amountMap, expiryMap } };
 }
 /**
  * ดึงรายการที่ "ไม่พร้อมใช้" (NOT_OK) ของการตรวจครั้งหนึ่งๆ สำหรับหน้ารายละเอียดใน Dashboard
