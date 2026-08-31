@@ -25,8 +25,13 @@ export async function getChecklistItems(moduleKey, locationCode) {
     .order('sort_order');
   if (error) return { error: error.message };
   // included_location_codes ว่าง/NULL = แสดงทุกจุด, มีค่า = แสดงเฉพาะจุดที่ระบุไว้เท่านั้น
+  // excluded_location_codes มีค่า = จุดที่อยู่ในลิสต์นี้จะไม่เห็นรายการนี้ (ใช้คู่กันได้)
   const filtered = locationCode
-    ? data.filter((it) => !it.included_location_codes || it.included_location_codes.length === 0 || it.included_location_codes.includes(locationCode))
+    ? data.filter((it) => {
+        const includedOk = !it.included_location_codes || it.included_location_codes.length === 0 || it.included_location_codes.includes(locationCode);
+        const notExcluded = !it.excluded_location_codes || !it.excluded_location_codes.includes(locationCode);
+        return includedOk && notExcluded;
+      })
     : data;
   return { data: filtered };
 }
