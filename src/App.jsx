@@ -278,21 +278,6 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
               <div className="menu-card-status">
                 <span className={`dash-pill ${pillClass}`}>{pillLabel}</span>
               </div>
-              {!isAmbulance && (
-                <button
-                  type="button"
-                  className="menu-card-report-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
-                      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role) || user?.role === 'VISITOR'
-                    );
-                    requestMonthlyReport(`รายงานตารางรายเดือน — ${loc.label}`, (year, month) => generateLocationCalendarPDF(loc.code, loc.label, groups, year, month));
-                  }}
-                >
-                  📊 รายงานตารางรายเดือน (รวมทุกชุด)
-                </button>
-              )}
             </button>
           );
         })}
@@ -325,8 +310,16 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
   return (
     <div className="screen">
       <TopBar title={location.label} sub="เลือกรายการที่ต้องการตรวจสอบ" onBack={onBack} />
-      {location.code === 'aircraft_bag' && (
-        <div style={{ padding: '16px 24px 0', maxWidth: 640, margin: '0 auto', width: '100%' }}>
+      <div style={{ padding: '16px 24px 0', maxWidth: 640, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <button
+          type="button"
+          className="dash-pdf-btn"
+          style={{ width: '100%' }}
+          onClick={() => requestMonthlyReport(`รายงานตารางรายเดือน — ${location.label}`, (year, month) => generateLocationCalendarPDF(location.code, location.label, groups, year, month))}
+        >
+          📊 รายงานตารางรายเดือน (รวมทุกชุด)
+        </button>
+        {location.code === 'aircraft_bag' && (
           <button
             type="button"
             className="dash-pdf-btn"
@@ -335,8 +328,8 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
           >
             📊 รายงานสรุปรายไตรมาส
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <main className="menu-grid">
         {groups.map((g) => {
           const tintClass = g.accent === '#1D9A63' ? 'menu-card-green'
