@@ -29,7 +29,7 @@ function monthLabel(year, month) {
  * วาดตารางเช็คลิสต์ 1 ชุด (1 โมดูล/กระเป๋า) ลงในหน้าปัจจุบันของ doc
  * ใช้ร่วมกันทั้งรายงานแบบทีละชุด (generateItemCalendarPDF) และแบบรวมทุกชุด (generateLocationCalendarPDF)
  */
-function drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap }) {
+function drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap, amountMap }) {
   const daysInMonth = new Date(year, month, 0).getDate();
 
   doc.setFontSize(14);
@@ -73,10 +73,15 @@ function drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items
     return [
       String(idx + 1),
       it.item_name,
-      it.standard_qty || '',
+      it.numeric_input && it.unit ? `${it.standard_qty || ''} (${it.unit})` : (it.standard_qty || ''),
       ...Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;
         const status = statusMap[`${it.item_id}-${day}`];
+        // รายการที่กรอกเป็นตัวเลข (เช่น ปริมาณออกซิเจน) — ถ้ามีการบันทึกจริงในวันนั้น ให้โชว์ตัวเลขจริงแทนเครื่องหมายถูก
+        if (it.numeric_input) {
+          const amt = amountMap && amountMap[`${it.item_id}-${day}`];
+          if (amt) return amt;
+        }
         if (nonWorkDays.has(day)) {
           if (status === 'OK') return 'OK';
           if (status === 'NEAR') return 'NEAR';
@@ -154,14 +159,14 @@ export async function generateItemCalendarPDF(locationCode, moduleKey, moduleLab
     alert('ดึงข้อมูลไม่สำเร็จ: ' + res.error);
     return;
   }
-  const { locationLabel, items, statusMap } = res.data;
+  const { locationLabel, items, statusMap, amountMap } = res.data;
   const holidayDays = new Set(holidayRes.data || []);
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   registerThaiFont(doc);
 
   drawModuleSection._holidayDays = holidayDays;
-  drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap });
+  drawModuleSection(doc, { year, month, locationLabel, moduleLabel, items, statusMap, amountMap });
   addFootnotes(doc, now);
 
   await sharePDF(doc, `Checklist_${locationLabel}_${moduleLabel}_${monthLabel(year, month).replace(' ', '_')}.pdf`);
@@ -195,8 +200,8 @@ export async function generateLocationCalendarPDF(locationCode, locationLabel, m
 
   moduleGroups.forEach((g, idx) => {
     if (idx > 0) doc.addPage();
-    const { items, statusMap } = results[idx].data;
-    drawModuleSection(doc, { year, month, locationLabel, moduleLabel: g.label, items, statusMap });
+    const { items, statusMap, amountMap } = results[idx].data;
+    drawModuleSection(doc, { year, month, locationLabel, moduleLabel: g.label, items, statusMap, amountMap });
   });
 
   addFootnotes(doc, now);
