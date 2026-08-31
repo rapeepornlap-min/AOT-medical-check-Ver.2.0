@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>แบบสำรวจความพึงพอใจ — AOT Medical Readiness System</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1B3A6B;
+    --navy-dark: #122A52;
+    --cyan: #17A9C4;
+    --cyan-light: #E6F6F9;
+    --bg: #F4F6F9;
+    --card: #FFFFFF;
+    --text: #1F2937;
+    --text-dim: #6B7686;
+    --line: #E3E8EF;
+    --ok: #1D9A63;
+    --ok-bg: #E7F7EF;
+    --warn: #B8760A;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sarabun', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+  .top {
+    background: var(--navy);
+    color: #fff;
+    padding: 28px 20px 60px;
+    text-align: center;
+  }
+  .top-badge {
+    width: 52px; height: 52px; border-radius: 14px; background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;
+    font-size: 24px; font-weight: 800;
+  }
+  .top h1 { font-size: 19px; margin: 0 0 6px; font-weight: 700; }
+  .top p { font-size: 13px; margin: 0; color: #C7D6E8; }
+
+  .wrap { max-width: 560px; margin: -36px auto 40px; padding: 0 16px; }
+
+  .card {
+    background: var(--card); border-radius: var(--radius); padding: 22px 20px;
+    box-shadow: 0 8px 24px rgba(27,58,107,0.10); margin-bottom: 16px;
+  }
+  .intro { font-size: 13.5px; color: var(--text-dim); line-height: 1.6; }
+
+  .field-label {
+    display: block; font-size: 14px; font-weight: 700; color: var(--navy);
+    margin-bottom: 10px;
+  }
+  .field-label .req { color: #D64545; margin-left: 2px; }
+  .field-sub { font-size: 12px; color: var(--text-dim); font-weight: 400; margin-top: 2px; display: block; }
+
+  select, textarea {
+    width: 100%; padding: 12px 14px; border-radius: 8px; border: 1.5px solid var(--line);
+    font-size: 15px; font-family: inherit; color: var(--text); background: #fff;
+  }
+  select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(23,169,196,0.15); }
+  textarea { min-height: 80px; resize: vertical; }
+
+  .rating-row { display: flex; gap: 8px; }
+  .rating-btn {
+    flex: 1; padding: 12px 4px; border-radius: 8px; border: 1.5px solid var(--line);
+    background: #fff; color: var(--text-dim); font-family: inherit; font-size: 18px;
+    font-weight: 700; cursor: pointer; transition: all 0.15s ease; text-align: center;
+  }
+  .rating-btn:hover { border-color: var(--cyan); }
+  .rating-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .rating-caption {
+    display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .section { margin-bottom: 26px; }
+  .section:last-child { margin-bottom: 0; }
+
+  .submit-btn {
+    width: 100%; padding: 15px; border-radius: 8px; border: none;
+    background: linear-gradient(90deg, #1c7fd6 0%, var(--navy) 100%);
+    color: #fff; font-size: 16px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: opacity 0.15s ease;
+  }
+  .submit-btn:hover:not(:disabled) { opacity: 0.9; }
+  .submit-btn:disabled { background: #C4CBD6; cursor: not-allowed; }
+
+  .error-msg { color: #D64545; font-size: 13px; font-weight: 600; margin-top: 10px; text-align: center; }
+
+  .thankyou { text-align: center; padding: 20px 10px; }
+  .thankyou-check {
+    width: 64px; height: 64px; border-radius: 50%; background: var(--ok-bg);
+    border: 2px solid var(--ok); color: var(--ok); font-size: 30px;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;
+  }
+  .thankyou h2 { color: var(--navy); font-size: 19px; margin: 0 0 8px; }
+  .thankyou p { color: var(--text-dim); font-size: 14px; margin: 0; line-height: 1.6; }
+
+  footer { text-align: center; font-size: 11.5px; color: var(--text-dim); padding: 0 20px 30px; }
+</style>
+</head>
+<body>
+
+  <div class="top">
+    <div class="top-badge">+</div>
+    <h1>AOT Medical Readiness System</h1>
+    <p>แบบสำรวจความพึงพอใจผู้ใช้งานระบบ</p>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <p class="intro">
+        แบบสำรวจนี้ใช้เวลาไม่ถึง 2 นาที คำตอบของท่านจะนำไปใช้ปรับปรุงระบบให้ใช้งานสะดวกขึ้น
+        ไม่ต้องระบุชื่อ ตอบตามความรู้สึกจริงได้เลยค่ะ
+      </p>
+    </div>
+
+    <form id="surveyForm">
+      <div class="card">
+        <div class="section">
+          <label class="field-label">บทบาทของท่าน<span class="req">*</span></label>
+          <select id="role" required>
+            <option value="" disabled selected>เลือกบทบาท</option>
+            <option value="NURSE">พยาบาล</option>
+            <option value="EMR_EMT">EMR / EMT</option>
+            <option value="PN">ผู้ช่วยพยาบาล (PN)</option>
+            <option value="PHARMACIST">เภสัชกร</option>
+            <option value="ADMIN">ผู้ดูแลระบบ</option>
+            <option value="OTHER">อื่นๆ</option>
+          </select>
+        </div>
+
+        <div class="section">
+          <label class="field-label">ความถี่ในการใช้งานระบบนี้<span class="req">*</span></label>
+          <select id="usage_frequency" required>
+            <option value="" disabled selected>เลือกความถี่</option>
+            <option value="ทุกวัน">ทุกวัน</option>
+            <option value="สัปดาห์ละ 2-3 ครั้ง">สัปดาห์ละ 2-3 ครั้ง</option>
+            <option value="สัปดาห์ละครั้ง">สัปดาห์ละครั้ง</option>
+            <option value="นานๆ ครั้ง">นานๆ ครั้ง</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section">
+          <label class="field-label">ความพึงพอใจโดยรวมต่อระบบ<span class="req">*</span></label>
+          <div class="rating-row" data-rating="overall_satisfaction">
+            <button type="button" class="rating-btn" data-value="1">1</button>
+            <button type="button" class="rating-btn" data-value="2">2</button>
+            <button type="button" class="rating-btn" data-value="3">3</button>
+            <button type="button" class="rating-btn" data-value="4">4</button>
+            <button type="button" class="rating-btn" data-value="5">5</button>
+          </div>
+          <div class="rating-caption"><span>ไม่พอใจเลย</span><span>พอใจมาก</span></div>
+        </div>
+
+        <div class="section">
+          <label class="field-label">ความง่ายในการใช้งาน<span class="req">*</span></label>
+          <div class="rating-row" data-rating="ease_of_use">
+            <button type="button" class="rating-btn" data-value="1">1</button>
+            <button type="button" class="rating-btn" data-value="2">2</button>
+            <button type="button" class="rating-btn" data-value="3">3</button>
+            <button type="button" class="rating-btn" data-value="4">4</button>
+            <button type="button" class="rating-btn" data-value="5">5</button>
+          </div>
+          <div class="rating-caption"><span>ใช้งานยาก</span><span>ใช้งานง่าย</span></div>
+        </div>
+
+        <div class="section">
+          <label class="field-label">ความเร็ว / ความเสถียรของระบบ<span class="req">*</span></label>
+          <div class="rating-row" data-rating="speed_stability">
+            <button type="button" class="rating-btn" data-value="1">1</button>
+            <button type="button" class="rating-btn" data-value="2">2</button>
+            <button type="button" class="rating-btn" data-value="3">3</button>
+            <button type="button" class="rating-btn" data-value="4">4</button>
+            <button type="button" class="rating-btn" data-value="5">5</button>
+          </div>
+          <div class="rating-caption"><span>ช้า/ค้างบ่อย</span><span>เร็ว/เสถียรมาก</span></div>
+        </div>
+
+        <div class="section">
+          <label class="field-label">ความชัดเจนของรายงาน (PDF / ตารางรายเดือน)<span class="req">*</span></label>
+          <div class="rating-row" data-rating="report_clarity">
+            <button type="button" class="rating-btn" data-value="1">1</button>
+            <button type="button" class="rating-btn" data-value="2">2</button>
+            <button type="button" class="rating-btn" data-value="3">3</button>
+            <button type="button" class="rating-btn" data-value="4">4</button>
+            <button type="button" class="rating-btn" data-value="5">5</button>
+          </div>
+          <div class="rating-caption"><span>อ่านยาก/สับสน</span><span>อ่านง่าย/ชัดเจน</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section">
+          <label class="field-label">ปัญหาที่เคยพบระหว่างใช้งาน
+            <span class="field-sub">เช่น หน้าค้าง, กดแล้วไม่มีอะไรเกิดขึ้น, ตัวเลขผิด ฯลฯ (ไม่บังคับ)</span>
+          </label>
+          <textarea id="issues_faced" placeholder="พิมพ์ปัญหาที่เจอ..."></textarea>
+        </div>
+
+        <div class="section">
+          <label class="field-label">อยากให้เพิ่ม/ปรับปรุงอะไรบ้าง
+            <span class="field-sub">ฟีเจอร์ใหม่ หรือสิ่งที่อยากให้ใช้งานง่ายขึ้น (ไม่บังคับ)</span>
+          </label>
+          <textarea id="feature_requests" placeholder="พิมพ์ข้อเสนอแนะ..."></textarea>
+        </div>
+
+        <div class="section">
+          <label class="field-label">ข้อเสนอแนะเพิ่มเติม
+            <span class="field-sub">(ไม่บังคับ)</span>
+          </label>
+          <textarea id="additional_comments" placeholder="ความคิดเห็นอื่นๆ..."></textarea>
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">ส่งแบบสำรวจ</button>
+      <div class="error-msg" id="errorMsg" style="display:none;"></div>
+    </form>
+
+    <div class="card thankyou" id="thankyouCard" style="display:none;">
+      <div class="thankyou-check">✓</div>
+      <h2>ขอบคุณสำหรับความคิดเห็นค่ะ</h2>
+      <p>คำตอบของท่านถูกบันทึกเรียบร้อยแล้ว จะนำไปใช้ปรับปรุงระบบต่อไปค่ะ</p>
+    </div>
+  </div>
+
+  <footer>ฝ่ายการแพทย์ ท่าอากาศยานสุวรรณภูมิ · AOT Medical Readiness System</footer>
+
+<script>
+  const SUPABASE_URL = 'https://cwgscrslppyshtmncwig.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Z3NjcnNscHB5c2h0bW5jd2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2Mjg4MDQsImV4cCI6MjA5OTIwNDgwNH0.HkZ6-lMYh4pXhteNSGw4ldL7-bPey9vrDnJZd1DxsqA';
+
+  const ratings = { overall_satisfaction: null, ease_of_use: null, speed_stability: null, report_clarity: null };
+
+  document.querySelectorAll('.rating-row').forEach((row) => {
+    const key = row.dataset.rating;
+    row.querySelectorAll('.rating-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.rating-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        ratings[key] = Number(btn.dataset.value);
+      });
+    });
+  });
+
+  const form = document.getElementById('surveyForm');
+  const errorMsg = document.getElementById('errorMsg');
+  const submitBtn = document.getElementById('submitBtn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorMsg.style.display = 'none';
+
+    const role = document.getElementById('role').value;
+    const usage_frequency = document.getElementById('usage_frequency').value;
+
+    if (!role || !usage_frequency || !ratings.overall_satisfaction || !ratings.ease_of_use || !ratings.speed_stability || !ratings.report_clarity) {
+      errorMsg.textContent = 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบก่อนส่งค่ะ';
+      errorMsg.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const payload = {
+      role,
+      usage_frequency,
+      overall_satisfaction: ratings.overall_satisfaction,
+      ease_of_use: ratings.ease_of_use,
+      speed_stability: ratings.speed_stability,
+      report_clarity: ratings.report_clarity,
+      issues_faced: document.getElementById('issues_faced').value.trim() || null,
+      feature_requests: document.getElementById('feature_requests').value.trim() || null,
+      additional_comments: document.getElementById('additional_comments').value.trim() || null,
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังส่ง...';
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/satisfaction_survey_responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('save failed');
+
+      form.style.display = 'none';
+      document.getElementById('thankyouCard').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      errorMsg.textContent = 'ส่งไม่สำเร็จ กรุณาลองใหม่อีกครั้งค่ะ';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'ส่งแบบสำรวจ';
+    }
+  });
+</script>
+
+</body>
+</html>
