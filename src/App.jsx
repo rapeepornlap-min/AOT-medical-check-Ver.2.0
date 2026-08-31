@@ -331,7 +331,7 @@ function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
             type="button"
             className="dash-pdf-btn"
             style={{ width: '100%' }}
-            onClick={() => generateQuarterlySummaryPDF(location.code, location.label, groups)}
+            onClick={() => requestQuarterlyReport('รายงานสรุปรายไตรมาส', (year, qStartMonth) => generateQuarterlySummaryPDF(location.code, location.label, groups, year, qStartMonth))}
           >
             📊 รายงานสรุปรายไตรมาส
           </button>
@@ -1723,6 +1723,80 @@ function MonthPickerModal({ request, onClose }) {
 }
 
 // -------------------------------------------------------------------------
+// ตัวเลือกไตรมาส/ปีก่อนออกรายงานสรุปรายไตรมาส (เพื่อดูรายงานย้อนหลังได้)
+// -------------------------------------------------------------------------
+const QUARTER_OPTIONS = [
+  { qStartMonth: 10, label: 'ไตรมาส 1 (ต.ค. - ธ.ค.)' },
+  { qStartMonth: 1, label: 'ไตรมาส 2 (ม.ค. - มี.ค.)' },
+  { qStartMonth: 4, label: 'ไตรมาส 3 (เม.ย. - มิ.ย.)' },
+  { qStartMonth: 7, label: 'ไตรมาส 4 (ก.ค. - ก.ย.)' },
+];
+
+function currentQuarterStartMonth(now) {
+  const month = now.getMonth() + 1;
+  if (month >= 10) return 10;
+  if (month >= 7) return 7;
+  if (month >= 4) return 4;
+  return 1;
+}
+
+/**
+ * เรียกใช้แทนการยิงฟังก์ชันสร้างรายงานตรงๆ — จะเด้งให้เลือกไตรมาส/ปีก่อนเสมอ
+ * onGenerate: (year, qStartMonth) => void — ฟังก์ชันสร้างรายงานจริง เรียกพร้อมปี ค.ศ. และเดือนเริ่มไตรมาส (1/4/7/10) ที่เลือก
+ */
+function requestQuarterlyReport(title, onGenerate) {
+  window.dispatchEvent(new CustomEvent('aot-pick-quarter', { detail: { title, onGenerate } }));
+}
+
+function QuarterPickerModal({ request, onClose }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [qStartMonth, setQStartMonth] = useState(currentQuarterStartMonth(now));
+
+  useEffect(() => {
+    if (request) { setYear(now.getFullYear()); setQStartMonth(currentQuarterStartMonth(now)); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  if (!request) return null;
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+
+  return (
+    <div className="pdf-modal-overlay" onClick={onClose}>
+      <div className="month-picker-box" onClick={(e) => e.stopPropagation()}>
+        <div className="pdf-modal-header">
+          <span className="pdf-modal-title">{request.title}</span>
+          <button type="button" className="pdf-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        </div>
+        <div className="month-picker-body">
+          <label className="field-label">เลือกไตรมาส/ปีที่ต้องการดูรายงาน</label>
+          <div className="month-picker-selects">
+            <select className="filter-select" value={qStartMonth} onChange={(e) => setQStartMonth(Number(e.target.value))}>
+              {QUARTER_OPTIONS.map((q) => (
+                <option key={q.qStartMonth} value={q.qStartMonth}>{q.label}</option>
+              ))}
+            </select>
+            <select className="filter-select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {years.map((y) => (
+                <option key={y} value={y}>{y + 543}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ marginTop: 18 }}
+            onClick={() => { request.onGenerate(year, qStartMonth); onClose(); }}
+          >
+            ดูรายงาน
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
 // ตัวแสดง PDF ในหน้าเดิม (แทนการเปิดแท็บ/หน้าต่างใหม่ ซึ่งใช้ไม่ได้ใน in-app browser หลายตัว)
 // -------------------------------------------------------------------------
 function PdfViewerModal({ pdf, onClose }) {
@@ -1754,6 +1828,7 @@ export default function App() {
   const [showPendingAck, setShowPendingAck] = useState(false);
   const [pdfModal, setPdfModal] = useState(null);
   const [monthPickerRequest, setMonthPickerRequest] = useState(null);
+  const [quarterPickerRequest, setQuarterPickerRequest] = useState(null);
 
   useEffect(() => {
     const handler = (e) => setPdfModal(e.detail);
@@ -1765,6 +1840,12 @@ export default function App() {
     const handler = (e) => setMonthPickerRequest(e.detail);
     window.addEventListener('aot-pick-month', handler);
     return () => window.removeEventListener('aot-pick-month', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => setQuarterPickerRequest(e.detail);
+    window.addEventListener('aot-pick-quarter', handler);
+    return () => window.removeEventListener('aot-pick-quarter', handler);
   }, []);
 
   const handleLogout = async () => {
@@ -1797,6 +1878,7 @@ export default function App() {
       {screen}
       <PdfViewerModal pdf={pdfModal} onClose={() => setPdfModal(null)} />
       <MonthPickerModal request={monthPickerRequest} onClose={() => setMonthPickerRequest(null)} />
+      <QuarterPickerModal request={quarterPickerRequest} onClose={() => setQuarterPickerRequest(null)} />
     </>
   );
 }

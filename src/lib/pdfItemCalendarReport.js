@@ -223,16 +223,26 @@ function currentQuarterMonths(now) {
   else if (month >= 7) qStartMonth = 7;
   else if (month >= 4) qStartMonth = 4;
   else qStartMonth = 1;
-  return { qStartMonth, months: [qStartMonth, qStartMonth + 1, qStartMonth + 2].map((m) => ({ year, month: m })) };
+  return { qStartMonth, year };
+}
+
+function quarterMonthsFor(year, qStartMonth) {
+  return [qStartMonth, qStartMonth + 1, qStartMonth + 2].map((m) => ({ year, month: m }));
 }
 
 /**
  * รายงานสรุปรายไตรมาส — ตารางสรุป (ไม่ใช่ตารางรายวันแบบเดือน) แสดงสถานะ/วันที่ตรวจล่าสุดของแต่ละรายการ
- * ในไตรมาสปัจจุบัน (3 เดือน) เหมาะกับจุดที่ตรวจแบบไตรมาสละครั้ง เช่น กระเป๋า บ.ฉุกเฉิน
+ * ในไตรมาสที่ระบุ (3 เดือน) เหมาะกับจุดที่ตรวจแบบไตรมาสละครั้ง เช่น กระเป๋า บ.ฉุกเฉิน
+ * year, qStartMonth: ถ้าไม่ระบุจะใช้ไตรมาสปัจจุบัน (สำหรับดูรายงานย้อนหลัง ให้ระบุปี ค.ศ. และเดือนเริ่มไตรมาส 1/4/7/10)
  */
-export async function generateQuarterlySummaryPDF(locationCode, locationLabel, moduleGroups) {
+export async function generateQuarterlySummaryPDF(locationCode, locationLabel, moduleGroups, year, qStartMonth) {
   const now = new Date();
-  const { qStartMonth, months } = currentQuarterMonths(now);
+  if (!year || !qStartMonth) {
+    const current = currentQuarterMonths(now);
+    year = year || current.year;
+    qStartMonth = qStartMonth || current.qStartMonth;
+  }
+  const months = quarterMonthsFor(year, qStartMonth);
 
   const holidayResults = await Promise.all(months.map((m) => getPublicHolidays(m.year, m.month)));
   const holidayDays = new Set(holidayResults.flatMap((r) => r.data || []));
