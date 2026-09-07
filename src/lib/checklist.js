@@ -78,7 +78,7 @@ export async function getLatestInspectionAnswers(locationCode, moduleKey) {
 
   const { data: lastInspection, error: insError } = await supabase
     .from('inspections')
-    .select('id, submitted_at')
+    .select('id, submitted_at, inspector_name')
     .eq('location_id', location.id)
     .eq('module_key', moduleKey)
     .order('submitted_at', { ascending: false })
@@ -107,7 +107,8 @@ export async function getLatestInspectionAnswers(locationCode, moduleKey) {
     }
     map[it.item_code] = entry;
   });
-  return { data: map };
+  // meta บอกว่าบันทึกล่าสุดโดยใคร เมื่อไหร่ — ใช้แสดงในฟอร์มให้ผู้ใช้เห็นว่าใครตรวจครั้งล่าสุด
+  return { data: map, meta: { inspectorName: lastInspection.inspector_name, submittedAt: lastInspection.submitted_at } };
 }
 /**
  * นับจำนวนรายการ (ไม่รวมหัวข้อคั่น) ของแต่ละ module_key ที่ระบุ
@@ -278,7 +279,7 @@ export async function getTodayDailyLog(locationCode) {
 
   const { data, error } = await supabase
     .from('inspections')
-    .select('mileage, fuel_level, note, submitted_at')
+    .select('mileage, fuel_level, note, submitted_at, inspector_name')
     .eq('location_id', location.id)
     .eq('module_key', 'ambulance_daily')
     .order('submitted_at', { ascending: false })

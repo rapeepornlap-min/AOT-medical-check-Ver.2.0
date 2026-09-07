@@ -413,6 +413,7 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [alreadyLoggedToday, setAlreadyLoggedToday] = useState(false);
+  const [lastLogMeta, setLastLogMeta] = useState(null);
 
   useEffect(() => {
     getTodayDailyLog(vehicle.code).then((res) => {
@@ -421,6 +422,7 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
         setFuel(res.data.fuel_level || 'F');
         setNote(res.data.note || '');
         setAlreadyLoggedToday(true);
+        setLastLogMeta({ name: res.data.inspector_name, submittedAt: res.data.submitted_at });
       }
     });
   }, [vehicle.code]);
@@ -466,6 +468,9 @@ function DailyLogModule({ vehicle, user, onBack, onSaved }) {
         {alreadyLoggedToday && (
           <div className="reminder-banner" style={{ marginBottom: 12 }}>
             ✅ วันนี้บันทึกไปแล้ว — ข้อมูลด้านล่างคือค่าที่บันทึกล่าสุด แก้ไขแล้วกดบันทึกซ้ำได้ถ้าต้องการอัปเดต
+            {lastLogMeta?.name && (
+              <><br />บันทึกล่าสุดโดย {lastLogMeta.name} เมื่อ {formatThaiDateTime(new Date(lastLogMeta.submittedAt))}</>
+            )}
           </div>
         )}
         <label className="field-label">เลขไมล์ (กม.) *</label>
@@ -517,6 +522,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const [submitError, setSubmitError] = useState('');
 
   const [prefilled, setPrefilled] = useState(false);
+  const [lastRecordedMeta, setLastRecordedMeta] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
 
   const handlePhotoSelect = async (it, file) => {
@@ -566,6 +572,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
         });
         setAnswers(initial);
         setPrefilled(true);
+        if (lastRes.meta) setLastRecordedMeta(lastRes.meta);
       }
       setLoading(false);
     })();
@@ -671,6 +678,9 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
         {prefilled && (
           <div className="reminder-banner" style={{ marginBottom: 12 }}>
             🔄 แสดงข้อมูลจากการตรวจครั้งล่าสุด กรุณาตรวจสอบและแก้ไขให้ตรงกับสภาพจริงก่อนบันทึก
+            {lastRecordedMeta?.inspectorName && (
+              <><br />บันทึกล่าสุดโดย {lastRecordedMeta.inspectorName} เมื่อ {formatThaiDateTime(new Date(lastRecordedMeta.submittedAt))}</>
+            )}
           </div>
         )}
         <div className="checklist" style={isAdmin ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
