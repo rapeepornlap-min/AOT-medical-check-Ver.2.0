@@ -524,6 +524,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   const [prefilled, setPrefilled] = useState(false);
   const [lastRecordedMeta, setLastRecordedMeta] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
+  const [dirty, setDirty] = useState(false); // true เฉพาะเมื่อผู้ใช้แก้ไข/กรอกอะไรเองจริงๆ (ไม่นับข้อมูลที่ prefill มา)
 
   const handlePhotoSelect = async (it, file) => {
     if (!file) return;
@@ -579,7 +580,7 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
   }, [moduleKey, locationCode]);
 
   const rows = items.filter((it) => !it.is_header);
-  const setAnswer = (id, patch) => setAnswers((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }));
+  const setAnswer = (id, patch) => { setDirty(true); setAnswers((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } })); };
 
   const isAnswered = (it) => {
     const a = answers[it.id] || {};
@@ -633,8 +634,10 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
 
   // ถ้ากดกลับก่อนตรวจครบทุกรายการ ให้บันทึกฉบับร่างไว้ก่อน (สถานะ "ตรวจไม่ครบ")
   // เพื่อให้กลับมาตรวจต่อจากเดิมได้ในครั้งหน้า ไม่ต้องเริ่มใหม่และไม่เสียข้อมูลที่กรอกไปแล้ว
+  // สำคัญ: เช็คจาก "dirty" (ผู้ใช้แก้ไขเองจริงๆ) ไม่ใช่ rows.some(isAnswered) เพราะข้อมูลที่ prefill มาจากครั้งก่อน
+  // ก็ทำให้ isAnswered เป็น true ได้ทั้งที่ผู้ใช้ยังไม่ได้แตะอะไรเลย ถ้าเช็คผิดจะเผลอบันทึกซ้ำใส่ชื่อผู้ใช้ปัจจุบันทั้งที่แค่เปิดดู
   const handleBack = async () => {
-    if (isReadOnly || rows.length === 0 || !rows.some(isAnswered)) {
+    if (isReadOnly || rows.length === 0 || !dirty) {
       onBack();
       return;
     }
