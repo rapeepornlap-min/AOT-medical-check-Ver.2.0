@@ -4,6 +4,8 @@ import { supabase } from './supabaseClient';
 // จุดที่ตรวจแบบ "ไตรมาสละครั้ง" แทนที่จะเป็น "สัปดาห์ละครั้ง" แบบจุดอื่นๆ ทั่วไป
 // ไตรมาสนับตามปีงบประมาณไทย: ไตรมาส 1 ต.ค.-ธ.ค., ไตรมาส 2 ม.ค.-มี.ค., ไตรมาส 3 เม.ย.-มิ.ย., ไตรมาส 4 ก.ค.-ก.ย.
 const QUARTERLY_LOCATION_CODES = ['aircraft_bag'];
+// จุดที่ตรวจแบบ "เดือนละครั้ง" (รอบใหม่เริ่มวันที่ 1 ของทุกเดือน)
+const MONTHLY_LOCATION_CODES = ['er'];
 
 /**
  * คำนวณ "จุดเริ่มต้นรอบ" (UTC) สำหรับ location หนึ่งๆ — ใช้ตัดสินว่าค่าที่บันทึกไว้ยัง "ใช้ได้อยู่ในรอบนี้" หรือ "เก่าไปแล้วต้องตรวจใหม่"
@@ -22,6 +24,11 @@ function getPeriodStartUtc(locationCode) {
     else qStartMonth = 1;
     const qStartBkk = new Date(Date.UTC(nowBkk.getUTCFullYear(), qStartMonth - 1, 1));
     return new Date(qStartBkk.getTime() - BKK_OFFSET_MS);
+  }
+
+  if (MONTHLY_LOCATION_CODES.includes(locationCode)) {
+    const monthStartBkk = new Date(Date.UTC(nowBkk.getUTCFullYear(), nowBkk.getUTCMonth(), 1));
+    return new Date(monthStartBkk.getTime() - BKK_OFFSET_MS);
   }
 
   const dow = nowBkk.getUTCDay(); // 0=อาทิตย์..6=เสาร์ (เวลากรุงเทพฯ)
@@ -231,21 +238,21 @@ export async function getLatestStatusByLocation(locationIds) {
 
   // นับว่า "ตรวจแล้ว" เฉพาะการตรวจที่อยู่ในรอบปัจจุบันเท่านั้น (ปกติขึ้นรอบใหม่ทุกวันจันทร์ ยกเว้นจุดที่ตรวจแบบ
   // รายไตรมาส เช่น กระเป๋า บ.ฉุกเฉิน ให้สอดคล้องกับกฎ "นับ/ตรวจครั้งเดียวต่อรอบ" — การตรวจจากรอบก่อนถือว่ายังไม่ตรวจของรอบนี้
-  const quarterlyLocationIds = new Set();
-  if (locationIds.length > 0) {
-    const { data: quarterlyLocs } = await supabase
-      .from('locations')
-      .select('id')
-      .in('code', QUARTERLY_LOCATION_CODES)
-      .in('id', locationIds);
-    (quarterlyLocs || []).forEach((l) => quarterlyLocationIds.add(l.id));
-  }
+  const codesWithPeriod = [...QUARTERLY_LOCATION_CODES, ...MONTHLY_LOCATION_CODES];
+  const periodStartByLocationId = {};
   const weeklyPeriodStartUtc = getPeriodStartUtc(null);
-  const quarterlyPeriodStartUtc = getPeriodStartUtc(QUARTERLY_LOCATION_CODES[0]);
+  if (locationIds.length > 0) {
+    const { data: specialLocs } = await supabase
+      .from('locations')
+      .select('id, code')
+      .in('code', codesWithPeriod)
+      .in('id', locationIds);
+    (specialLocs || []).forEach((l) => { periodStartByLocationId[l.id] = getPeriodStartUtc(l.code); });
+  }
 
   const map = {};
   data.forEach((row) => {
-    const periodStart = quarterlyLocationIds.has(row.location_id) ? quarterlyPeriodStartUtc : weeklyPeriodStartUtc;
+    const periodStart = periodStartByLocationId[row.location_id] || weeklyPeriodStartUtc;
     if (new Date(row.submitted_at) < periodStart) return; // เก่ากว่ารอบนี้ ไม่นับว่าตรวจแล้ว
     if (!map[row.location_id]) map[row.location_id] = {};
     map[row.location_id][row.module_key] = row.overall_status;
