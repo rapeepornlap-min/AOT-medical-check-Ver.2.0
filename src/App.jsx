@@ -16,6 +16,11 @@ import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from 
 import './App.css';
 import logo from './assets/logo.png';
 
+// role ทั้งหมดที่บัญชีนี้มี (role หลัก + สิทธิ์เพิ่มเติมถ้ามี)
+function userRoles(user) {
+  return [user?.role, ...((user && user.extraRoles) || [])].filter(Boolean);
+}
+
 function formatThaiDateTime(date) {
   return date.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
 }
@@ -162,12 +167,12 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
 
   useEffect(() => {
     (async () => {
-      const res = await getLocationsWithResponsible(user.role);
+      const res = await getLocationsWithResponsible(userRoles(user));
       if (res.error) setLoadError(res.error);
       else setLocations(res.data || []);
       setLoading(false);
     })();
-  }, [user.role]);
+  }, [user.role, (user.extraRoles || []).join(',')]);
 
   const categories = useMemo(() => {
     const byCategory = {};
@@ -202,7 +207,7 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
             <div className="menu-card-subtitle">สรุปความพร้อมใช้งานภาพรวมทุกจุด</div>
           </button>
         )}
-        {!loading && !loadError && user.role === 'EMR_EMT' && (
+        {!loading && !loadError && userRoles(user).includes('EMR_EMT') && (
           <button className="menu-card" onClick={onOpenPendingAck}>
             <div className="menu-card-dot" />
             <div className="menu-card-label">🔔 รอรับทราบ</div>
@@ -247,7 +252,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
   const expectedKeysFor = (loc) => {
     if (isAmbulance) return AMBULANCE_MODULES.filter((m) => m.moduleKey).map((m) => m.moduleKey);
     const groups = (LOCATION_MODULE_GROUPS[loc.code] || []).filter(
-      (g) => !g.allowedRoles || g.allowedRoles.includes(user?.role) || user?.role === 'VISITOR'
+      (g) => !g.allowedRoles || g.allowedRoles.some((r) => userRoles(user).includes(r)) || user?.role === 'VISITOR'
     );
     return groups.map((g) => g.moduleKey).filter(Boolean);
   };
@@ -300,7 +305,7 @@ function LocationPicker({ categoryMeta, locations, user, isAmbulance, onSelectLo
 // -------------------------------------------------------------------------
 function ModuleGroupPicker({ location, user, onSelectModule, onBack }) {
   const groups = (LOCATION_MODULE_GROUPS[location.code] || []).filter(
-    (g) => !g.allowedRoles || g.allowedRoles.includes(user.role) || user.role === 'VISITOR'
+    (g) => !g.allowedRoles || g.allowedRoles.some((r) => userRoles(user).includes(r)) || user.role === 'VISITOR'
   );
   const [counts, setCounts] = useState({});
   const [moduleStatus, setModuleStatus] = useState({});
@@ -1854,7 +1859,7 @@ function RepairFormModal({ request, user, onClose }) {
     setLocationCode(prefill?.locationCode || '');
     setItemName(prefill?.itemName || '');
     (async () => {
-      const res = await getLocationsWithResponsible(user.role);
+      const res = await getLocationsWithResponsible(userRoles(user));
       setLocations(res.data || []);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2070,7 +2075,7 @@ function RepairListScreen({ user, onBack }) {
   };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const scopeLabel = managerDept ? DEPARTMENT_LABELS[managerDept] : user.role === 'ADMIN' ? 'ทุกฝ่าย' : 'รายการที่ฉันแจ้ง';
+  const scopeLabel = managerDept === 'ALL' ? 'ทุกฝ่าย' : managerDept ? DEPARTMENT_LABELS[managerDept] : user.role === 'ADMIN' ? 'ทุกฝ่าย' : 'รายการที่ฉันแจ้ง';
   const filtered = rows.filter((r) => (filter === 'ALL' ? true : filter === 'OPEN' ? (r.status === 'PENDING' || r.status === 'IN_PROGRESS') : r.status === filter));
   const tabs = [['OPEN', 'ที่ยังไม่เสร็จ'], ['DONE', 'เสร็จสิ้น'], ['CANCELLED', 'ยกเลิก'], ['ALL', 'ทั้งหมด']];
 
@@ -2099,7 +2104,7 @@ function RepairListScreen({ user, onBack }) {
         {!loading && !loadError && filtered.length === 0 && <div className="empty-state">ไม่มีรายการ</div>}
         <div className="checklist">
           {filtered.map((r) => (
-            <RepairCard key={r.id + r.status + (r.handler_note || '')} r={r} canManage={!!managerDept && managerDept === r.department} onChanged={load} />
+            <RepairCard key={r.id + r.status + (r.handler_note || '')} r={r} canManage={!!managerDept && (managerDept === 'ALL' || managerDept === r.department)} onChanged={load} />
           ))}
         </div>
       </main>

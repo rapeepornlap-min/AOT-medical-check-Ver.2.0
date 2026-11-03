@@ -215,11 +215,13 @@ export async function getWeeklyCalendar(year, month) {
 /**
  * ดึง location พร้อม responsible_name (ใช้แทน getLocationsForRole เดิมตอนต้องการชื่อผู้รับผิดชอบด้วย)
  */
-export async function getLocationsWithResponsible(role) {
+export async function getLocationsWithResponsible(roles) {
+  // รับได้ทั้ง role เดียว (string) หรือหลาย role (array) — บางบัญชีมีสิทธิ์เพิ่ม (extra_roles)
+  const roleList = Array.isArray(roles) ? roles : [roles];
   const { data, error } = await supabase
     .from('locations')
     .select('id, category, code, label, sort_order, allowed_roles, responsible_name')
-    .contains('allowed_roles', [role])
+    .overlaps('allowed_roles', roleList)
     .order('sort_order');
   if (error) return { error: error.message };
   return { data };

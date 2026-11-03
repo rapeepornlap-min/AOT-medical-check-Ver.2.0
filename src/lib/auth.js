@@ -14,11 +14,20 @@ export async function loginWithUsername(username, password) {
     return { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  // extra_roles = สิทธิ์เพิ่มเติมของบางบัญชี (เช่น พยาบาลที่ต้องตรวจได้ทั้งฝั่ง EMR/EMT)
+  // ถ้ายังไม่ได้เพิ่มคอลัมน์ใน DB (query พลาด) ให้ถอยกลับไปอ่านแบบเดิมเพื่อไม่ให้ล็อกอินพัง
+  let { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('id, full_name, role, is_active')
+    .select('id, full_name, role, is_active, extra_roles')
     .eq('id', authData.user.id)
     .single();
+  if (profileError) {
+    ({ data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('id, full_name, role, is_active')
+      .eq('id', authData.user.id)
+      .single());
+  }
 
   if (profileError || !profile || !profile.is_active) {
     await supabase.auth.signOut();
@@ -31,6 +40,7 @@ export async function loginWithUsername(username, password) {
       username: username.trim().toLowerCase(),
       name: profile.full_name,
       role: profile.role,
+      extraRoles: profile.extra_roles || [],
     },
   };
 }
