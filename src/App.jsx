@@ -10,6 +10,8 @@ import { generateMonthlyReportPDF } from './lib/pdfReport';
 import { generateDetailedMonthlyReportPDF } from './lib/pdfDetailReport';
 import { generateComplianceCalendarPDF } from './lib/pdfCalendarReport';
 import { generateProblemSummaryReportPDF } from './lib/pdfProblemSummaryReport';
+import { generateRepairReportPDF } from './lib/pdfRepairReport';
+import { createRepairRequest, uploadRepairPhoto, getRepairRequests, getMyRepairManagerDept, updateRepairStatus, URGENCY_LABELS, STATUS_LABELS, DEPARTMENT_LABELS } from './lib/repairs';
 import { ROLES, AMBULANCE_MODULES, LOCATION_MODULE_GROUPS, CATEGORY_META } from './locationsConfig';
 import './App.css';
 import logo from './assets/logo.png';
@@ -153,7 +155,7 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
 // -------------------------------------------------------------------------
 // เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
 // -------------------------------------------------------------------------
-function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPendingAck }) {
+function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPendingAck, onOpenRepairs }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -205,6 +207,13 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
             <div className="menu-card-dot" />
             <div className="menu-card-label">🔔 รอรับทราบ</div>
             <div className="menu-card-subtitle">การตรวจของคันที่คุณรับผิดชอบ</div>
+          </button>
+        )}
+        {!loading && !loadError && (
+          <button className="menu-card" onClick={onOpenRepairs}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-label">🔧 แจ้งซ่อม</div>
+            <div className="menu-card-subtitle">แจ้งอุปกรณ์ชำรุดและติดตามสถานะ</div>
           </button>
         )}
         {!loading && !loadError && categories.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบ</div>}
@@ -765,6 +774,15 @@ function DynamicChecklistForm({ locationCode, moduleKey, moduleLabel, user, onBa
                   )}
 
                   <input type="text" className="text-input note-input" placeholder="หมายเหตุ (ถ้ามี)" value={a.note || ''} onChange={(e) => setAnswer(it.id, { note: e.target.value })} />
+
+                  <button
+                    type="button"
+                    className="dash-pdf-btn dash-pdf-btn-outline"
+                    style={{ marginTop: 8, width: '100%', pointerEvents: 'auto' }}
+                    onClick={() => requestRepairReport({ locationCode, moduleKey, itemCode: it.item_code, itemName: it.item_name })}
+                  >
+                    🔧 แจ้งซ่อมรายการนี้
+                  </button>
 
                   {it.photo_attach && (
                     <div className="photo-attach-block">
@@ -1805,6 +1823,290 @@ function QuarterPickerModal({ request, onClose }) {
 // -------------------------------------------------------------------------
 // ตัวแสดง PDF ในหน้าเดิม (แทนการเปิดแท็บ/หน้าต่างใหม่ ซึ่งใช้ไม่ได้ใน in-app browser หลายตัว)
 // -------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// ระบบแจ้งซ่อม — ฟอร์มแจ้ง (modal) + หน้ารายการแจ้งซ่อม
+// -------------------------------------------------------------------------
+const URGENCY_COLORS = { NORMAL: '#6B7686', URGENT: '#B8760A', CRITICAL: '#D64545' };
+const REPAIR_STATUS_PILL = { PENDING: 'pill-danger', IN_PROGRESS: 'pill-warn', DONE: 'pill-ok', CANCELLED: 'pill-none' };
+
+function requestRepairReport(prefill) {
+  window.dispatchEvent(new CustomEvent('aot-repair-report', { detail: { prefill: prefill || null } }));
+}
+
+function RepairFormModal({ request, user, onClose }) {
+  const isVisitor = user.role === 'VISITOR';
+  const prefill = request?.prefill || null;
+  const [locations, setLocations] = useState([]);
+  const [locationCode, setLocationCode] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [description, setDescription] = useState('');
+  const [urgency, setUrgency] = useState('NORMAL');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!request) return;
+    setDescription(''); setUrgency('NORMAL'); setPhotoUrl(''); setError(''); setDone(false);
+    setLocationCode(prefill?.locationCode || '');
+    setItemName(prefill?.itemName || '');
+    (async () => {
+      const res = await getLocationsWithResponsible(user.role);
+      setLocations(res.data || []);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  // รายชื่ออุปกรณ์ของจุดที่เลือก ไว้เป็นตัวช่วยพิมพ์ (ยังพิมพ์ชื่ออื่นเองได้)
+  useEffect(() => {
+    if (!request || !locationCode || prefill?.itemName) { setSuggestions([]); return; }
+    const moduleKeys = locationCode.startsWith('AM-')
+      ? AMBULANCE_MODULES.map((m) => m.moduleKey).filter(Boolean)
+      : (LOCATION_MODULE_GROUPS[locationCode] || []).map((g) => g.moduleKey);
+    let cancelled = false;
+    (async () => {
+      const names = new Set();
+      for (const mk of moduleKeys) {
+        const res = await getChecklistItems(mk, locationCode);
+        (res.data || []).forEach((it) => { if (!it.is_header) names.add(it.item_name); });
+      }
+      if (!cancelled) setSuggestions([...names]);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request, locationCode]);
+
+  if (!request) return null;
+  const location = locations.find((l) => l.code === locationCode);
+
+  const handlePhoto = async (file) => {
+    if (!file) return;
+    if (isVisitor) { setPhotoUrl(URL.createObjectURL(file)); return; }
+    setUploading(true);
+    const res = await uploadRepairPhoto(file);
+    setUploading(false);
+    if (res.error) { setError('แนบรูปไม่สำเร็จ: ' + res.error); return; }
+    setError('');
+    setPhotoUrl(res.url);
+  };
+
+  const canSubmit = !!location && itemName.trim() && description.trim() && !uploading && !submitting;
+
+  const handleSubmit = async () => {
+    setError('');
+    if (isVisitor) { setDone(true); return; } // โหมดทดลอง ไม่บันทึกจริง
+    setSubmitting(true);
+    const res = await createRepairRequest({
+      user,
+      locationId: location.id,
+      locationCode: location.code,
+      locationLabel: location.label,
+      moduleKey: prefill?.moduleKey,
+      itemCode: prefill?.itemCode,
+      itemName: itemName.trim(),
+      description: description.trim(),
+      urgency,
+      photoUrl,
+    });
+    setSubmitting(false);
+    if (res.error) { setError(res.error); return; }
+    setDone(true);
+  };
+
+  return (
+    <div className="pdf-modal-overlay" onClick={onClose}>
+      <div className="month-picker-box" style={{ maxHeight: '90vh', overflowY: 'auto', width: 'min(520px, 94vw)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="pdf-modal-header">
+          <span className="pdf-modal-title">🔧 แจ้งซ่อม</span>
+          <button type="button" className="pdf-modal-close" onClick={onClose} aria-label="ปิด">✕</button>
+        </div>
+        <div className="month-picker-body">
+          {done ? (
+            <>
+              <div className="reminder-banner">
+                {isVisitor ? '🧪 โหมดทดลอง — ไม่ได้บันทึกข้อมูลจริง' : '✅ ส่งเรื่องแจ้งซ่อมเรียบร้อยแล้ว ผู้ดูแลงานซ่อมจะเห็นรายการนี้ทันที'}
+              </div>
+              <button type="button" className="btn-primary" style={{ marginTop: 16 }} onClick={onClose}>ปิด</button>
+            </>
+          ) : (
+            <>
+              {isVisitor && <div className="reminder-banner" style={{ marginBottom: 10 }}>🧪 โหมดทดลอง — กรอกได้ตามปกติ แต่ระบบจะไม่บันทึกจริง</div>}
+
+              <label className="field-label">จุดตรวจ / รถ</label>
+              <select className="filter-select" style={{ width: '100%' }} value={locationCode} disabled={!!prefill?.locationCode} onChange={(e) => setLocationCode(e.target.value)}>
+                <option value="">— เลือกจุดตรวจ/รถ —</option>
+                {locations.map((l) => <option key={l.id} value={l.code}>{l.label}</option>)}
+              </select>
+
+              <label className="field-label" style={{ marginTop: 12 }}>รายการอุปกรณ์ที่ต้องซ่อม</label>
+              <input
+                type="text"
+                className="text-input"
+                list="repair-item-suggestions"
+                placeholder="เลือกจากรายการ หรือพิมพ์ชื่ออุปกรณ์"
+                value={itemName}
+                readOnly={!!prefill?.itemName}
+                onChange={(e) => setItemName(e.target.value)}
+              />
+              <datalist id="repair-item-suggestions">
+                {suggestions.map((n) => <option key={n} value={n} />)}
+              </datalist>
+
+              <label className="field-label" style={{ marginTop: 12 }}>รายละเอียดอาการ</label>
+              <textarea
+                className="text-input"
+                rows={3}
+                placeholder="เช่น เปิดเครื่องไม่ติด สายชำรุด แบตเตอรี่เสื่อม"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                style={{ resize: 'vertical' }}
+              />
+
+              <label className="field-label" style={{ marginTop: 12 }}>ระดับความเร่งด่วน</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {Object.keys(URGENCY_LABELS).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setUrgency(k)}
+                    style={{
+                      flex: 1, padding: '10px 6px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      border: `2px solid ${URGENCY_COLORS[k]}`,
+                      background: urgency === k ? URGENCY_COLORS[k] : '#fff',
+                      color: urgency === k ? '#fff' : URGENCY_COLORS[k],
+                    }}
+                  >
+                    {URGENCY_LABELS[k]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="photo-attach-block" style={{ marginTop: 12 }}>
+                {photoUrl && <img src={photoUrl} alt="รูปประกอบ" className="photo-preview" />}
+                <label className={`photo-btn ${photoUrl ? 'photo-btn-active' : ''}`}>
+                  {uploading ? '⏳ กำลังอัปโหลด...' : photoUrl ? '📷 เปลี่ยนรูป' : '📷 แนบรูปประกอบ'}
+                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={uploading} onChange={(e) => handlePhoto(e.target.files[0])} />
+                </label>
+              </div>
+
+              <div className="checklist-standard" style={{ marginTop: 10 }}>ผู้แจ้ง: {user.name}</div>
+              {error && <div className="form-error">{error}</div>}
+              <button type="button" className="btn-primary" style={{ marginTop: 14 }} disabled={!canSubmit} onClick={handleSubmit}>
+                {submitting ? 'กำลังส่ง...' : 'ส่งเรื่องแจ้งซ่อม'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RepairCard({ r, canManage, onChanged }) {
+  const [note, setNote] = useState(r.handler_note || '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const setStatus = async (status) => {
+    setBusy(true); setMsg('');
+    const res = await updateRepairStatus(r.id, status, note);
+    setBusy(false);
+    if (res.error) { setMsg(res.error); return; }
+    onChanged();
+  };
+
+  return (
+    <div className="checklist-row" style={{ borderLeft: `5px solid ${URGENCY_COLORS[r.urgency] || '#6B7686'}`, display: 'block' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+        <div className="checklist-item-label">{r.item_name}</div>
+        <span className={`dash-pill ${REPAIR_STATUS_PILL[r.status] || 'pill-none'}`}>{STATUS_LABELS[r.status] || r.status}</span>
+      </div>
+      <div className="checklist-standard">
+        {r.location_label} · {DEPARTMENT_LABELS[r.department] || r.department} · <b style={{ color: URGENCY_COLORS[r.urgency] }}>{URGENCY_LABELS[r.urgency]}</b>
+      </div>
+      <div style={{ margin: '6px 0' }}>{r.description}</div>
+      {r.photo_url && <img src={r.photo_url} alt="รูปประกอบ" className="photo-preview" />}
+      <div className="checklist-standard">
+        แจ้งโดย {r.reporter_name} เมื่อ {formatThaiDateTime(new Date(r.created_at))}
+        {r.handler_name && <><br />ผู้รับเรื่องล่าสุด: {r.handler_name}</>}
+        {r.status === 'DONE' && r.completed_at && <><br />เสร็จสิ้นเมื่อ {formatThaiDateTime(new Date(r.completed_at))}</>}
+        {!canManage && r.handler_note && <><br />หมายเหตุผู้ดูแล: {r.handler_note}</>}
+      </div>
+      {canManage && (
+        <div style={{ marginTop: 10 }}>
+          <input type="text" className="text-input note-input" placeholder="บันทึกของผู้ดูแล เช่น ส่งซ่อมที่ไหน คาดว่าเสร็จเมื่อไร" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            {Object.keys(STATUS_LABELS).filter((s) => s !== r.status).map((s) => (
+              <button key={s} type="button" className="dash-pdf-btn dash-pdf-btn-outline" style={{ flex: '1 1 auto' }} disabled={busy} onClick={() => setStatus(s)}>
+                → {STATUS_LABELS[s]}
+              </button>
+            ))}
+            {note !== (r.handler_note || '') && (
+              <button type="button" className="dash-pdf-btn" style={{ flex: '1 1 auto' }} disabled={busy} onClick={() => setStatus(r.status)}>💾 บันทึกหมายเหตุ</button>
+            )}
+          </div>
+          {msg && <div className="form-error">{msg}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RepairListScreen({ user, onBack }) {
+  const [rows, setRows] = useState([]);
+  const [managerDept, setManagerDept] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [filter, setFilter] = useState('OPEN');
+
+  const load = async () => {
+    const [res, mg] = await Promise.all([getRepairRequests(), getMyRepairManagerDept(user.id)]);
+    if (res.error) setLoadError(res.error); else setRows(res.data);
+    setManagerDept(mg.data);
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const scopeLabel = managerDept ? DEPARTMENT_LABELS[managerDept] : user.role === 'ADMIN' ? 'ทุกฝ่าย' : 'รายการที่ฉันแจ้ง';
+  const filtered = rows.filter((r) => (filter === 'ALL' ? true : filter === 'OPEN' ? (r.status === 'PENDING' || r.status === 'IN_PROGRESS') : r.status === filter));
+  const tabs = [['OPEN', 'ที่ยังไม่เสร็จ'], ['DONE', 'เสร็จสิ้น'], ['CANCELLED', 'ยกเลิก'], ['ALL', 'ทั้งหมด']];
+
+  return (
+    <div className="screen">
+      <TopBar title="🔧 รายการแจ้งซ่อม" sub={`${scopeLabel} · ${rows.length} รายการ`} onBack={onBack} />
+      <main className="form-body">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+          <button type="button" className="btn-primary" onClick={() => requestRepairReport(null)}>➕ แจ้งซ่อมใหม่</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="dash-pdf-btn" style={{ flex: 1 }} onClick={() => requestMonthlyReport(`รายงานแจ้งซ่อม — ${scopeLabel}`, (year, month) => generateRepairReportPDF({ year, month }, scopeLabel))}>
+              📄 PDF รายเดือน
+            </button>
+            <button type="button" className="dash-pdf-btn dash-pdf-btn-outline" style={{ flex: 1 }} onClick={() => generateRepairReportPDF(null, scopeLabel)}>
+              📄 PDF ทั้งหมด
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {tabs.map(([k, label]) => (
+              <button key={k} type="button" className={`dash-pdf-btn ${filter === k ? '' : 'dash-pdf-btn-outline'}`} style={{ flex: '1 1 auto' }} onClick={() => setFilter(k)}>{label}</button>
+            ))}
+          </div>
+        </div>
+        {loading && <div className="empty-state">กำลังโหลด...</div>}
+        {loadError && <div className="form-error">โหลดข้อมูลไม่สำเร็จ: {loadError}</div>}
+        {!loading && !loadError && filtered.length === 0 && <div className="empty-state">ไม่มีรายการ</div>}
+        <div className="checklist">
+          {filtered.map((r) => (
+            <RepairCard key={r.id + r.status + (r.handler_note || '')} r={r} canManage={!!managerDept && managerDept === r.department} onChanged={load} />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function PdfViewerModal({ pdf, onClose }) {
   if (!pdf) return null;
   return (
@@ -1832,6 +2134,8 @@ export default function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPendingAck, setShowPendingAck] = useState(false);
+  const [showRepairs, setShowRepairs] = useState(false);
+  const [repairRequest, setRepairRequest] = useState(null);
   const [pdfModal, setPdfModal] = useState(null);
   const [monthPickerRequest, setMonthPickerRequest] = useState(null);
   const [quarterPickerRequest, setQuarterPickerRequest] = useState(null);
@@ -1840,6 +2144,12 @@ export default function App() {
     const handler = (e) => setPdfModal(e.detail);
     window.addEventListener('aot-show-pdf', handler);
     return () => window.removeEventListener('aot-show-pdf', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => setRepairRequest(e.detail);
+    window.addEventListener('aot-repair-report', handler);
+    return () => window.removeEventListener('aot-repair-report', handler);
   }, []);
 
   useEffect(() => {
@@ -1860,6 +2170,7 @@ export default function App() {
     setActiveCategory(null);
     setShowDashboard(false);
     setShowPendingAck(false);
+    setShowRepairs(false);
   };
 
   let screen;
@@ -1867,12 +2178,14 @@ export default function App() {
     screen = showForgotPassword
       ? <ChangePasswordScreen onBack={() => setShowForgotPassword(false)} />
       : <LoginScreen onLoggedIn={setUser} onForgotPassword={() => setShowForgotPassword(true)} />;
+  } else if (showRepairs) {
+    screen = <RepairListScreen user={user} onBack={() => setShowRepairs(false)} />;
   } else if (showPendingAck) {
     screen = <PendingAcknowledgmentsScreen user={user} onBack={() => setShowPendingAck(false)} />;
   } else if (showDashboard) {
     screen = <DashboardScreen user={user} onBack={() => setShowDashboard(false)} />;
   } else if (!activeCategory) {
-    screen = <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} />;
+    screen = <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} onOpenRepairs={() => setShowRepairs(true)} />;
   } else if (activeCategory.id === 'AMBULANCE') {
     screen = <AmbulanceWorkspace locations={activeCategory.locations} user={user} onExit={() => setActiveCategory(null)} />;
   } else {
@@ -1882,6 +2195,7 @@ export default function App() {
   return (
     <>
       {screen}
+      {user && <RepairFormModal request={repairRequest} user={user} onClose={() => setRepairRequest(null)} />}
       <PdfViewerModal pdf={pdfModal} onClose={() => setPdfModal(null)} />
       <MonthPickerModal request={monthPickerRequest} onClose={() => setMonthPickerRequest(null)} />
       <QuarterPickerModal request={quarterPickerRequest} onClose={() => setQuarterPickerRequest(null)} />
