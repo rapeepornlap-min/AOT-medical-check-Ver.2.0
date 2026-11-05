@@ -160,7 +160,7 @@ function LoginScreen({ onLoggedIn, onForgotPassword }) {
 // -------------------------------------------------------------------------
 // เมนูหลัก — ดึง locations ที่ role นี้เข้าถึงได้จาก Supabase แล้วจัดกลุ่มตาม category
 // -------------------------------------------------------------------------
-function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPendingAck, onOpenRepairs }) {
+function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPendingAck, onOpenRepairs, onOpenAcls }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -219,6 +219,13 @@ function MainMenu({ user, onSelectCategory, onLogout, onOpenDashboard, onOpenPen
             <div className="menu-card-dot" />
             <div className="menu-card-label">🔧 แจ้งซ่อม</div>
             <div className="menu-card-subtitle">แจ้งอุปกรณ์ชำรุดและติดตามสถานะ</div>
+          </button>
+        )}
+        {!loading && !loadError && (
+          <button className="menu-card" onClick={onOpenAcls}>
+            <div className="menu-card-dot" />
+            <div className="menu-card-label">📋 ACLS Guideline 2025</div>
+            <div className="menu-card-subtitle">แนวทางการช่วยชีวิตขั้นสูง ฉบับล่าสุด</div>
           </button>
         )}
         {!loading && !loadError && categories.length === 0 && <div className="empty-state">ไม่มีรายการที่ท่านมีสิทธิ์ตรวจสอบ</div>}
@@ -2112,6 +2119,85 @@ function RepairListScreen({ user, onBack }) {
   );
 }
 
+// -------------------------------------------------------------------------
+// ACLS Guideline 2025 (Thai Resuscitation Council) — ดู algorithm ได้ทุก role
+// ไฟล์ภาพอยู่ที่ public/acls2025/ (ภาพทีละหน้า 1-5.jpg + ไฟล์ PDF ต้นฉบับ)
+// -------------------------------------------------------------------------
+const ACLS_PAGES = [
+  { n: 1, title: 'BLS ผู้ใหญ่', sub: 'Basic Life Support for Healthcare Provider' },
+  { n: 2, title: 'Cardiac Arrest', sub: 'Adult Cardiac Arrest Algorithm' },
+  { n: 3, title: 'Tachycardia', sub: 'Adult Tachycardia with Pulse Algorithm' },
+  { n: 4, title: 'Bradycardia', sub: 'Adult Bradycardia with Pulse Algorithm' },
+  { n: 5, title: 'Post-Cardiac Arrest', sub: 'Management of Post-Cardiac Arrest Patients' },
+];
+const ACLS_PDF_URL = '/acls2025/ACLS-2025-algorithm.pdf';
+
+function AclsGuidelineScreen({ onBack }) {
+  const [page, setPage] = useState(2);
+  const [zoomed, setZoomed] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const current = ACLS_PAGES.find((p) => p.n === page);
+
+  const openPdf = async () => {
+    setPdfLoading(true);
+    try {
+      const resp = await fetch(ACLS_PDF_URL);
+      const blob = await resp.blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      window.dispatchEvent(new CustomEvent('aot-show-pdf', { detail: { dataUrl, filename: 'ACLS-Guideline-2025.pdf' } }));
+    } catch (e) {
+      alert('เปิดไฟล์ PDF ไม่สำเร็จ');
+    }
+    setPdfLoading(false);
+  };
+
+  return (
+    <div className="screen">
+      <TopBar title="📋 ACLS Guideline 2025" sub="Thai Resuscitation Council · มิถุนายน พ.ศ. 2569" onBack={onBack} />
+      <main className="form-body">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {ACLS_PAGES.map((p) => (
+            <button
+              key={p.n}
+              type="button"
+              className={`dash-pdf-btn ${page === p.n ? '' : 'dash-pdf-btn-outline'}`}
+              style={{ flex: '1 1 auto' }}
+              onClick={() => { setPage(p.n); setZoomed(false); }}
+            >
+              {p.title}
+            </button>
+          ))}
+        </div>
+        <div className="checklist-standard" style={{ marginBottom: 8 }}>{current.sub}</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <button type="button" className="dash-pdf-btn dash-pdf-btn-outline" style={{ flex: 1 }} onClick={() => setZoomed((z) => !z)}>
+            {zoomed ? '🔍 ย่อให้พอดีหน้าจอ' : '🔍 ขยายอ่านรายละเอียด'}
+          </button>
+          <button type="button" className="dash-pdf-btn" style={{ flex: 1 }} disabled={pdfLoading} onClick={openPdf}>
+            {pdfLoading ? '⏳ กำลังเปิด...' : '📄 เปิดไฟล์ PDF ทั้งชุด'}
+          </button>
+        </div>
+        <div style={{ overflow: 'auto', border: '1px solid #E1E6EE', borderRadius: 12, background: '#fff', maxHeight: '75vh' }}>
+          <img
+            src={`/acls2025/${current.n}.jpg`}
+            alt={`${current.title} — ${current.sub}`}
+            onClick={() => setZoomed((z) => !z)}
+            style={{ display: 'block', width: zoomed ? '220%' : '100%', maxWidth: zoomed ? 'none' : '100%', height: 'auto', cursor: zoomed ? 'zoom-out' : 'zoom-in' }}
+          />
+        </div>
+        <div className="checklist-standard" style={{ marginTop: 10 }}>
+          แนวทางนี้ใช้เป็นข้อมูลอ้างอิงประกอบการปฏิบัติงาน ที่มา: Thai Resuscitation Council
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function PdfViewerModal({ pdf, onClose }) {
   if (!pdf) return null;
   return (
@@ -2140,6 +2226,7 @@ export default function App() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPendingAck, setShowPendingAck] = useState(false);
   const [showRepairs, setShowRepairs] = useState(false);
+  const [showAcls, setShowAcls] = useState(false);
   const [repairRequest, setRepairRequest] = useState(null);
   const [pdfModal, setPdfModal] = useState(null);
   const [monthPickerRequest, setMonthPickerRequest] = useState(null);
@@ -2176,6 +2263,7 @@ export default function App() {
     setShowDashboard(false);
     setShowPendingAck(false);
     setShowRepairs(false);
+    setShowAcls(false);
   };
 
   let screen;
@@ -2183,6 +2271,8 @@ export default function App() {
     screen = showForgotPassword
       ? <ChangePasswordScreen onBack={() => setShowForgotPassword(false)} />
       : <LoginScreen onLoggedIn={setUser} onForgotPassword={() => setShowForgotPassword(true)} />;
+  } else if (showAcls) {
+    screen = <AclsGuidelineScreen onBack={() => setShowAcls(false)} />;
   } else if (showRepairs) {
     screen = <RepairListScreen user={user} onBack={() => setShowRepairs(false)} />;
   } else if (showPendingAck) {
@@ -2190,7 +2280,7 @@ export default function App() {
   } else if (showDashboard) {
     screen = <DashboardScreen user={user} onBack={() => setShowDashboard(false)} />;
   } else if (!activeCategory) {
-    screen = <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} onOpenRepairs={() => setShowRepairs(true)} />;
+    screen = <MainMenu user={user} onSelectCategory={setActiveCategory} onLogout={handleLogout} onOpenDashboard={() => setShowDashboard(true)} onOpenPendingAck={() => setShowPendingAck(true)} onOpenRepairs={() => setShowRepairs(true)} onOpenAcls={() => setShowAcls(true)} />;
   } else if (activeCategory.id === 'AMBULANCE') {
     screen = <AmbulanceWorkspace locations={activeCategory.locations} user={user} onExit={() => setActiveCategory(null)} />;
   } else {
